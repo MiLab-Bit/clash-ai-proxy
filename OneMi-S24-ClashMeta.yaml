@@ -1,0 +1,491 @@
+# ============================================================
+# OneMi — AI Proxy for Samsung S24 / Android / ClashMeta
+# 内部版本 1.1 | 2026-10-05（v1.1：MRS meta 分支统一 / 0.0.0.0/32 清除 / 广告去重）
+# 11 层 AI 分流架构 / MRS 原生规则集 / TUN mixed / fake-ip 持久化
+# 适用：三星 S24 / 安卓 14 + ClashMeta for Android
+# 使用方法：传到手机 -> ClashMeta -> 配置 -> 从文件导入
+# ⚠️ 安卓设置 → 连接 → 更多连接 → 私人 DNS → 必须选"关闭"
+# ⚠️ 开热点/USB共享 → 先改 strict-route: false
+# ⚠️ CMFA 默认选组：Gemini→Google-AI / ChatGPT→AI-Proxy / 其他→Proxy
+# ============================================================
+
+mode: rule
+mixed-port: 7890
+allow-lan: false
+log-level: warning
+ipv6: false
+external-controller: 127.0.0.1:9090
+secret: YOUR_S24_DASHBOARD_SECRET    # v5.5: 随机强密码（每台设备不同）
+unified-delay: true
+tcp-concurrent: true
+geodata-mode: true
+geox-url:
+  geoip: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip.dat
+  geosite: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite.dat
+  mmdb: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/country.mmdb
+geo-auto-update: true
+geo-update-interval: 168
+keep-alive-interval: 30
+global-client-fingerprint: chrome
+tun:
+  enable: true
+  stack: mixed                            # v5.2: mixed（TCP=system + UDP=gvisor），比纯 system 更兼容 ROM + UDP 游戏更稳
+  auto-route: true
+  strict-route: true                      # 防泄漏——自用没事，要开热点/USB 共享改成 false
+  auto-detect-interface: true
+  mtu: 1500                               # v5.3: 防 WiFi/5G 切换时 UDP 卡死（默认 9000 太大）
+  dns-hijack:
+  - any:53
+  - tcp://any:53                          # v5.2: 补 TCP/53，有些 App 走 TCP DNS（单纯 UDP/53 拦不住）
+sniffer:
+  enable: true
+  force-dns-mapping: true
+  parse-pure-ip: false
+  override-destination: false
+  sniff:
+    TLS:
+      ports:
+      - 443
+      - 8443
+    HTTP:
+      ports:
+      - 80
+      - 8080-8880
+    QUIC:
+      ports:
+      - 443
+      - 8443
+  skip-domain:
+  - +.bank.example
+  - +.icbc.com.cn
+  - +.cmbchina.com
+  - +.bankcomm.com
+  - Mijia Cloud
+  - +.apple.com
+  - +.icloud.com
+dns:
+  enable: true
+  listen: 127.0.0.1:1053          # v5.6: 收窄攻击面（0.0.0.0 → 127.0.0.1）
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter-mode: blacklist
+  prefer-h3: false
+  respect-rules: true
+  use-hosts: true
+  use-system-hosts: false
+  cache-algorithm: arc                    # v5.4: ARC 缓存算法，命中率比默认好
+  fake-ip-filter:
+  - '*.lan'
+  - '*.local'
+  - '*.arpa'
+  - time.*.com
+  - ntp.*.com
+  - +.market.xiaomi.com
+  - localhost.ptlogin2.qq.com
+  - '*.msftncsi.com'
+  - www.msftconnecttest.com
+  - +.googleapis.com
+  - +.googleusercontent.com
+  - +.ggpht.com
+  - +.play.google.com
+  - +.android.clients.google.com
+  - +.connectivitycheck.gstatic.com
+  - +.samsung.com
+  - +.samsungcloud.com
+  - +.securesamsungcloud.com
+  # S24 评审: 删 openai/chatgpt/anthropic/claude/gemini 的 fake-ip 放行
+  # 理由：规则顺序已修（细分在前），域名匹配先命中走代理，不需要放行真 IP
+  # 保留反而会让 TUN 下连接阶段只剩 IP，sniffer 没命中时可能走错路
+  default-nameserver:
+  - 119.29.29.29
+  - 223.5.5.5
+  nameserver:
+  - https://doh.pub/dns-query
+  - https://dns.alidns.com/dns-query
+  fallback:
+  - https://dns.google/dns-query
+  - https://1.1.1.1/dns-query
+  # v5.4: 按 GEOSITE 分层 DNS，比手写十行 policy 更好维护
+  nameserver-policy:
+    "geosite:cn": ['https://doh.pub/dns-query', 'https://dns.alidns.com/dns-query']
+    "geosite:google": ['https://dns.google/dns-query']
+    "geosite:openai": ['https://dns.google/dns-query']
+    "geosite:anthropic": ['https://dns.google/dns-query']
+    "geosite:gemini": ['https://dns.google/dns-query']
+    "geosite:apple": ['https://doh.pub/dns-query', 'https://dns.alidns.com/dns-query']
+    "geosite:microsoft": ['https://doh.pub/dns-query', 'https://dns.alidns.com/dns-query']
+    # v5.4: 广告域名静默返回空——比 REJECT 更不容易出现"加载转圈"
+    "geosite:category-ads-all": rcode://success
+  proxy-server-nameserver:
+  - https://doh.pub/dns-query
+  - https://dns.alidns.com/dns-query
+  # v5.5: 直连流量专用 DNS——国内/Apple 直连时不走代理、不被 fake-ip 污染
+  direct-nameserver:
+  - https://doh.pub/dns-query
+  - https://dns.alidns.com/dns-query
+  direct-nameserver-follow-policy: true     # 直连 DNS 也遵守 nameserver-policy
+  fallback-filter:
+    geoip: true
+    geoip-code: CN
+    ipcidr:
+    - 240.0.0.0/4
+    - 100.64.0.0/10               # v5.6: 补 CGNAT 网段
+    # v5.6: 删 domain 三段（fake-ip + nameserver-policy 已管，v4 时代残留）
+    # v1.1: 删 0.0.0.0/32（纯噪音 IP，不会出现在真实解析中）
+profile:
+  store-selected: true
+  store-fake-ip: true                      # v5.4: 持久化 fake-ip，重载配置后 AI 域名不用重新解析
+# v5.7: 改用 proxy-providers 自动拉取机场节点，不再手贴
+# 换机场只改下面的 url 即可，规则和策略组不用动
+proxy-providers:
+  fightlyd:
+    type: http
+    url: https://www.fightlyd.site/api/v1/client/subscribe?token=YOUR_SUBSCRIBE_TOKEN
+    interval: 86400                         # 24h 自动更新一次
+    path: ./proxy_providers/fightlyd.yaml
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+    filter: "SG-|USA-|HK-|JP-|AU-|LU-|UK-"  # 过滤掉"剩余流量/到期时间"等信息节点
+    override:
+      skip-cert-verify: false               # 收紧：机场默认 true，我们覆盖成 false
+rule-providers:
+  # v5.5: mihomo 原生 MRS 格式（比 YAML 解析快、体积小、更新规范）
+  geosite-ai:
+    type: http
+    behavior: classical
+    format: mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ai-chat-!cn.mrs
+    path: ./ruleset/meta/geosite-ai.mrs
+    interval: 86400
+  geosite-cn:
+    type: http
+    behavior: classical
+    format: mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.mrs
+    path: ./ruleset/meta/geosite-cn.mrs
+    interval: 86400
+  geosite-ads:
+    type: http
+    behavior: classical
+    format: mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ads-all.mrs
+    path: ./ruleset/meta/geosite-ads.mrs
+    interval: 86400
+  geoip-cn:
+    type: http
+    behavior: classical
+    format: mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/cn.mrs
+    path: ./ruleset/meta/geoip-cn.mrs
+    interval: 86400
+  # blackmatrix7 YAML 备用（更细粒度，AI 服务专用）
+  openai-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OpenAI/OpenAI.yaml
+    path: ./ruleset/blackmatrix7/openai.yaml
+    interval: 86400
+  gemini-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Gemini/Gemini.yaml
+    path: ./ruleset/blackmatrix7/gemini.yaml
+    interval: 86400
+  claude-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Claude/Claude.yaml
+    path: ./ruleset/blackmatrix7/claude.yaml
+    interval: 86400
+  copilot-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/GithubCopilot/GithubCopilot.yaml
+    path: ./ruleset/blackmatrix7/copilot.yaml
+    interval: 86400
+  telegram-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Telegram/Telegram.yaml
+    path: ./ruleset/blackmatrix7/telegram.yaml
+    interval: 86400
+  netflix-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Netflix/Netflix.yaml
+    path: ./ruleset/blackmatrix7/netflix.yaml
+    interval: 86400
+  spotify-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Spotify/Spotify.yaml
+    path: ./ruleset/blackmatrix7/spotify.yaml
+    interval: 86400
+  discord-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Discord/Discord.list
+    path: ./ruleset/blackmatrix7/discord.yaml
+    interval: 86400
+proxy-groups:
+# v5.7: 所有组用 use: [fightlyd] 引用订阅节点，不再硬编码
+- name: Google-AI
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use: [fightlyd]
+- name: AI-Proxy
+  type: url-test
+  lazy: true
+  url: https://chatgpt.com/cdn-cgi/trace
+  interval: 180
+  tolerance: 120
+  use: [fightlyd]
+- name: Note-Tools
+  type: url-test
+  lazy: true
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  tolerance: 100
+  use: [fightlyd]
+- name: Dev-AI
+  type: url-test
+  lazy: true
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  tolerance: 100
+  use: [fightlyd]
+- name: CF-Strict
+  type: select
+  use: [fightlyd]
+- name: Social
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://discord.com/api/v1/ping
+  interval: 300
+  use: [fightlyd]
+- name: Dev-Svc
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use: [fightlyd]
+- name: Web3
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use: [fightlyd]
+- name: Finance
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use: [fightlyd]
+- name: Game-Media
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use: [fightlyd]
+- name: Shopping
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use: [fightlyd]
+- name: Proxy
+  type: url-test
+  lazy: true
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  tolerance: 80
+  use: [fightlyd]
+rules:
+# ---- v5.3: 局域网/私有地址最先直连（防 NAS/打印机/热点泄漏）----
+- IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+- IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+- IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+- IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+- IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
+- GEOIP,private,DIRECT,no-resolve
+# ---- blackmatrix7 细分规则集（厂商优先）----
+- RULE-SET,gemini-direct,Google-AI
+- RULE-SET,claude-direct,AI-Proxy
+- RULE-SET,openai-direct,AI-Proxy
+- RULE-SET,copilot-direct,Dev-AI
+- RULE-SET,telegram-direct,Social
+- RULE-SET,netflix-direct,Game-Media
+- RULE-SET,spotify-direct,Game-Media
+- RULE-SET,discord-direct,Social
+- GEOSITE,openai,AI-Proxy
+- GEOSITE,anthropic,AI-Proxy
+- GEOSITE,gemini,Google-AI
+- GEOSITE,google,Google-AI
+- GEOSITE,youtube,Game-Media
+- GEOSITE,telegram,Social
+- GEOSITE,discord,Social
+- GEOSITE,netflix,Game-Media
+- GEOSITE,spotify,Game-Media
+- GEOSITE,github,Dev-AI
+- GEOSITE,docker,Dev-Svc
+- DOMAIN-SUFFIX,gemini.google.com,Google-AI
+- DOMAIN-SUFFIX,generativelanguage.googleapis.com,Google-AI
+- DOMAIN-SUFFIX,aistudio.google.com,Google-AI
+- DOMAIN-SUFFIX,ai.google.dev,Google-AI
+- DOMAIN-SUFFIX,deepmind.google,Google-AI
+- DOMAIN-SUFFIX,notebooklm.google.com,Google-AI
+# v5.4: 删 DOMAIN-KEYWORD,gemini（太宽，会误匹配 gemini.example-blog.com 等）
+- DOMAIN-SUFFIX,perplexity.ai,CF-Strict
+- DOMAIN-SUFFIX,mistral.ai,CF-Strict
+- DOMAIN-SUFFIX,poe.com,CF-Strict
+- DOMAIN-SUFFIX,sora.com,CF-Strict
+- DOMAIN-SUFFIX,grok.com,AI-Proxy
+- DOMAIN-SUFFIX,x.ai,AI-Proxy
+- DOMAIN-SUFFIX,cohere.com,AI-Proxy
+- DOMAIN-SUFFIX,character.ai,AI-Proxy
+# v5.4: AI 静态资源补全——不补的话图片/代码块/CSS 卡住
+- DOMAIN-SUFFIX,oaistatic.com,AI-Proxy
+- DOMAIN-SUFFIX,openaiassets.com,AI-Proxy
+- DOMAIN-SUFFIX,oaiusercontent.com,AI-Proxy
+- DOMAIN-SUFFIX,files.chatgpt.com,AI-Proxy
+- DOMAIN-SUFFIX,anthropicusercontent.com,AI-Proxy
+- DOMAIN-SUFFIX,claudeusercontent.com,AI-Proxy
+- DOMAIN-SUFFIX,cdn.anthropic.com,AI-Proxy
+- DOMAIN-SUFFIX,static.claude.ai,AI-Proxy
+# v5.4: 删 DOMAIN-KEYWORD,claude/openai/chatgpt（太宽，GEOSITE+RULE-SET 已覆盖）
+- DOMAIN-SUFFIX,cursor.sh,Dev-AI
+- DOMAIN-SUFFIX,cursor.com,Dev-AI
+- DOMAIN-SUFFIX,v0.dev,Dev-AI
+- DOMAIN-SUFFIX,replit.com,Dev-AI
+- DOMAIN-SUFFIX,codeium.com,Dev-AI
+- DOMAIN-SUFFIX,huggingface.co,Dev-AI
+- DOMAIN-SUFFIX,notion.so,Note-Tools
+- DOMAIN-SUFFIX,notion.site,Note-Tools
+- DOMAIN-SUFFIX,obsidian.md,Note-Tools
+- DOMAIN-SUFFIX,craft.do,Note-Tools
+- DOMAIN-SUFFIX,pypi.org,Dev-Svc
+- DOMAIN-SUFFIX,pythonhosted.org,Dev-Svc
+- DOMAIN-SUFFIX,npmjs.com,Dev-Svc
+- DOMAIN-SUFFIX,vercel.com,Dev-Svc
+- DOMAIN-SUFFIX,netlify.com,Dev-Svc
+- DOMAIN-SUFFIX,supabase.com,Dev-Svc
+- DOMAIN-SUFFIX,binance.com,Web3
+- DOMAIN-SUFFIX,coinbase.com,Web3
+- DOMAIN-SUFFIX,okx.com,Web3
+- DOMAIN-SUFFIX,bybit.com,Web3
+- DOMAIN-SUFFIX,uniswap.org,Web3
+- DOMAIN-SUFFIX,metamask.io,Web3
+- DOMAIN-SUFFIX,etherscan.io,Web3
+- DOMAIN-SUFFIX,coingecko.com,Web3
+- DOMAIN-SUFFIX,coinmarketcap.com,Web3
+- DOMAIN-SUFFIX,opensea.io,Web3
+- DOMAIN-SUFFIX,dune.com,Web3
+- DOMAIN-SUFFIX,tradingview.com,Finance
+- DOMAIN-SUFFIX,bloomberg.com,Finance
+- DOMAIN-SUFFIX,reuters.com,Finance
+- DOMAIN-SUFFIX,nytimes.com,Finance
+- DOMAIN-SUFFIX,wsj.com,Finance
+- DOMAIN-SUFFIX,ft.com,Finance
+- DOMAIN-SUFFIX,economist.com,Finance
+# 学术 → Dev-AI（S24 评审：原在 Finance 分类错误）
+- DOMAIN-SUFFIX,arxiv.org,Dev-AI
+- DOMAIN-SUFFIX,nature.com,Dev-AI
+- DOMAIN-SUFFIX,steampowered.com,Game-Media
+- DOMAIN-SUFFIX,steamcommunity.com,Game-Media
+- DOMAIN-SUFFIX,epicgames.com,Game-Media
+- DOMAIN-SUFFIX,disneyplus.com,Game-Media
+- DOMAIN-SUFFIX,hbomax.com,Game-Media
+- DOMAIN-SUFFIX,primevideo.com,Game-Media
+- DOMAIN-SUFFIX,hulu.com,Game-Media
+- DOMAIN-SUFFIX,max.com,Game-Media
+- DOMAIN-SUFFIX,crunchyroll.com,Game-Media
+- DOMAIN-SUFFIX,amazon.com,Shopping
+- DOMAIN-SUFFIX,amazon.co.jp,Shopping
+- DOMAIN-SUFFIX,ebay.com,Shopping
+- DOMAIN-SUFFIX,shein.com,Shopping
+- DOMAIN-SUFFIX,zara.com,Shopping
+- DOMAIN-SUFFIX,figma.com,Shopping
+- DOMAIN-SUFFIX,canva.com,Shopping
+# v5.4: 删 DOMAIN-KEYWORD,twitter/instagram/facebook（太宽，DOMAIN-SUFFIX 已够用）
+- DOMAIN-SUFFIX,x.com,Proxy
+- DOMAIN-SUFFIX,twimg.com,Proxy
+- DOMAIN-SUFFIX,api.twitter.com,Proxy
+# v5.4: 删 DOMAIN-KEYWORD,instagram/facebook（太宽）
+- DOMAIN-SUFFIX,instagram.com,Proxy
+- DOMAIN-SUFFIX,fb.me,Proxy
+- DOMAIN-SUFFIX,fbcdn.net,Proxy
+- DOMAIN-SUFFIX,tiktok.com,Proxy
+- DOMAIN-SUFFIX,reddit.com,Proxy
+- DOMAIN-SUFFIX,redd.it,Proxy
+# v5.5: 广告 REJECT 移到 MATCH 前（DNS 层已 rcode://success 静默，规则层放最后兜底）
+# ---- v5.3: Apple/Microsoft/iCloud 直连提前（原在后半段，可能被宽规则截获）----
+- GEOSITE,apple,DIRECT
+- GEOSITE,icloud,DIRECT
+- GEOSITE,microsoft,DIRECT
+- DOMAIN-SUFFIX,apple.com,DIRECT
+- DOMAIN-SUFFIX,icloud.com,DIRECT
+- DOMAIN-SUFFIX,icloud-content.com,DIRECT
+- DOMAIN-SUFFIX,mzstatic.com,DIRECT
+- DOMAIN-SUFFIX,apple-cloudkit.com,DIRECT
+- DOMAIN-SUFFIX,apple-dns.net,DIRECT
+- DOMAIN-SUFFIX,apps.apple.com,DIRECT           # v5.4: App Store
+- DOMAIN-SUFFIX,ocsp.apple.com,DIRECT           # v5.4: 证书状态检查
+- DOMAIN-SUFFIX,valid.apple.com,DIRECT          # v5.4: 证书验证
+# v5.6: 删 iPhone APNs 跨端残留（push/feedback/gsp-ocsp/validation/mask/ckdatabase 是 iOS 专属）
+- DOMAIN-SUFFIX,microsoft.com,DIRECT
+- DOMAIN-SUFFIX,microsoftonline.com,DIRECT
+- DOMAIN-SUFFIX,office.com,DIRECT
+- DOMAIN-SUFFIX,office365.com,DIRECT
+- DOMAIN-SUFFIX,live.com,DIRECT
+- DOMAIN-SUFFIX,windows.net,DIRECT
+- DOMAIN-SUFFIX,msftauth.net,DIRECT
+- DOMAIN-SUFFIX,windowsupdate.com,DIRECT
+- DOMAIN-SUFFIX,skydrive.wns.windows.com,DIRECT  # v5.4: OneDrive/推送
+- DOMAIN-SUFFIX,config.edge.skype.com,DIRECT     # v5.4: Skype/Teams
+# ---- v5.3: CN 域名直连（放在 Apple/MS 之后、GEOIP 之前）----
+- GEOSITE,cn,DIRECT
+# ---- GitHub CDN → Dev-AI ----
+- DOMAIN-SUFFIX,github.io,Dev-AI
+- DOMAIN-SUFFIX,githubassets.com,Dev-AI
+- DOMAIN-SUFFIX,github.dev,Dev-AI
+- DOMAIN-SUFFIX,cloudflare.com,Proxy
+- DOMAIN-SUFFIX,workers.dev,Proxy
+- DOMAIN-SUFFIX,pages.dev,Proxy
+- DOMAIN-SUFFIX,tailscale.com,DIRECT
+- DOMAIN-SUFFIX,tailscale.io,DIRECT
+- DOMAIN-SUFFIX,steamcontent.com,DIRECT
+- DOMAIN-SUFFIX,steamstatic.com,DIRECT
+- DOMAIN-SUFFIX,steamcdn-a.akamaihd.net,DIRECT
+- DOMAIN-SUFFIX,steam-chat.com,DIRECT
+- DOMAIN-SUFFIX,line.me,Proxy
+- DOMAIN-SUFFIX,line-apps.com,Proxy
+- DOMAIN-SUFFIX,naver.jp,Proxy
+- DOMAIN-SUFFIX,pixiv.net,Proxy
+- DOMAIN-SUFFIX,pximg.net,Proxy
+- DOMAIN-SUFFIX,samsung.com.cn,DIRECT
+- DOMAIN-SUFFIX,samsung.com,DIRECT
+- DOMAIN-SUFFIX,samsungdns.com,DIRECT          # v5.4: Samsung DNS
+- DOMAIN-SUFFIX,bspg.samsung-pp.com,DIRECT     # v5.4: Samsung 推送
+# ---- Samsung GMS / 安卓推送直连（S24 评审补全）----
+- DOMAIN-SUFFIX,gms.android.google.com,DIRECT  # GMS 推送服务
+# v1.1: 删 googleadservices/googlesyndication 单条 REJECT——已被 GEOSITE,category-ads-all 兜底
+# ---- MRS geosite-ai 总类兜底（厂商规则已在前，这里兜剩余的 AI 域名）----
+- RULE-SET,geosite-ai,AI-Proxy
+- GEOIP,CN,DIRECT,no-resolve              # v5.3: 加 no-resolve，fake-ip 下不反解 CN IP，速度更稳
+# v5.5: 广告兜底拦截（DNS 层已静默，这里规则层再兜一次）
+- GEOSITE,category-ads-all,REJECT
+- MATCH,Proxy
+hosts: {}
+find-process-mode: 'off'

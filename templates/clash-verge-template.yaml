@@ -1,0 +1,608 @@
+# ============================================================
+# Clash Verge / mihomo — 11 层 AI 优化架构 v5 收尾版
+# 两元店机场（lyhycloud）+ 全部 24 项实战优化 + 5 项专业评审收尾修正
+# 生成时间：2026-10-05
+# v5 新增：tcp-concurrent / sniffer / geodata / GeoSite / nameserver-policy / max-failed-times
+# v5 收尾：skip-cert-verify:false / sniffer 稳模式 / TUN 开启 / 广告 GEOSITE / Apple/MS 补全
+# ============================================================
+
+mode: rule
+mixed-port: 7897
+allow-lan: false
+log-level: warning
+ipv6: false                              # #1 禁 IPv6
+external-controller: 127.0.0.1:9097
+secret: verge-admin-2026
+unified-delay: true
+bind-address: '*'
+external-controller-pipe: \\.\pipe\verge-mihomo
+
+# ====== v5 新增全局优化 ======
+tcp-concurrent: true                     # #15 并发建连，自动选最快的 TCP 链路
+geodata-mode: true                       # #16 用 dat 格式替代 mmdb，内存-40%，查询更快
+geox-url:                                # dat 格式自动下载地址
+  geoip: https://github.com/MetaCubeX/meta-rules-dat/releases/latest/download/geoip.dat
+  geosite: https://github.com/MetaCubeX/meta-rules-dat/releases/latest/download/geosite.dat
+  mmdb: https://github.com/MetaCubeX/meta-rules-dat/releases/latest/download/country.mmdb
+geo-auto-update: true                    # 自动更新 geo 数据库
+geo-update-interval: 168                 # 每周更新一次
+keep-alive-interval: 30                  # #17 保活间隔 15→30s，省流量省电
+global-client-fingerprint: chrome        # #18 全局 TLS 指纹统一为 chrome
+
+tun:
+  enable: true                             # v5 收尾：开启 TUN，CLI/游戏/App 也走规则
+  stack: gvisor
+  auto-route: true
+  auto-redirect: true
+  strict-route: true
+  auto-detect-interface: true
+  dns-hijack:
+  - any:53
+
+external-controller-cors:
+  allow-private-network: true
+  allow-origins:
+  - tauri://localhost
+  - http://tauri.localhost
+  - https://yacd.metacubex.one
+  - https://metacubex.github.io
+  - https://board.zash.run.place
+
+# ============================================================
+# Sniffer 嗅探器 — 从 TLS SNI / HTTP Host 还原真实域名
+# #19 fake-ip 模式下让 DOMAIN 规则精准命中（不再靠 GeoIP 兜底）
+# v5 收尾：稳模式 — parse-pure-ip:false / override-destination:false
+#          不对纯 IP 嗅探，不覆盖证书固定连接，银行/Apple 不报错
+# ============================================================
+sniffer:
+  enable: true
+  force-dns-mapping: true                # 对 fake-ip 的连接也启用嗅探
+  parse-pure-ip: false                   # v5 收尾：不对纯 IP 连接嗅探（银行/企业服务）
+  override-destination: false            # v5 收尾：不覆盖目标地址（证书固定应用安全）
+  sniff:
+    TLS:
+      ports:
+      - 443
+      - 8443
+    HTTP:
+      ports:
+      - 80
+      - 8080-8880
+    QUIC:
+      ports:
+      - 443
+      - 8443
+  skip-domain:                           # v5 收尾：不嗅探的域名（银行/Apple/智能家居）
+  - '+.bank.example'
+  - '+.icbc.com.cn'
+  - '+.cmbchina.com'
+  - '+.bankcomm.com'
+  - 'Mijia Cloud'
+  - '+.apple.com'
+  - '+.icloud.com'
+
+# ============================================================
+# DNS — fake-ip + AI 域名真实解析 + DoH fallback + 分域名分流
+# ============================================================
+dns:
+  enable: true
+  listen: :53
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter-mode: blacklist
+  prefer-h3: false
+  respect-rules: true
+  use-hosts: true
+  use-system-hosts: false
+  fake-ip-filter:
+  - '*.lan'
+  - '*.local'
+  - '*.arpa'
+  - time.*.com
+  - ntp.*.com
+  - +.market.xiaomi.com
+  - localhost.ptlogin2.qq.com
+  - '*.msftncsi.com'
+  - www.msftconnecttest.com
+  # AI 服务域名 — 需要真实 DNS 解析（fake-ip 会被检测）
+  - +.openai.com
+  - +.chatgpt.com
+  - +.anthropic.com
+  - +.claude.ai
+  - +.gemini.google.com
+  - +.generativelanguage.googleapis.com
+  default-nameserver:
+  - 223.5.5.5
+  - 119.29.29.29
+  nameserver:
+  - https://doh.pub/dns-query
+  - https://dns.alidns.com/dns-query
+  - 223.5.5.5
+  fallback:
+  - https://1.1.1.1/dns-query
+  - https://dns.google/dns-query
+  - tls://8.8.8.8:853
+  # #20 nameserver-policy — AI 域名直接走 Google DoH，比国内 DoH 快 200ms+
+  nameserver-policy:
+    "+.openai.com": https://dns.google/dns-query
+    "+.chatgpt.com": https://dns.google/dns-query
+    "+.oaistatic.com": https://dns.google/dns-query
+    "+.anthropic.com": https://dns.google/dns-query
+    "+.claude.ai": https://dns.google/dns-query
+    "+.gemini.google.com": https://dns.google/dns-query
+    "+.generativelanguage.googleapis.com": https://dns.google/dns-query
+    "+.perplexity.ai": https://dns.google/dns-query
+    "+.x.ai": https://dns.google/dns-query
+  proxy-server-nameserver:
+  - https://doh.pub/dns-query
+  - https://dns.alidns.com/dns-query
+  fallback-filter:
+    geoip: true
+    geoip-code: CN
+    ipcidr:
+    - 240.0.0.0/4
+    - 0.0.0.0/32
+    domain:
+    - +.google.com
+    - +.facebook.com
+    - +.youtube.com
+
+profile:
+  store-selected: true
+
+# ============================================================
+# 节点定义（订阅会自动更新覆盖）
+# global-client-fingerprint: chrome 已全局设置，节点不再单独写
+# v5 收尾：skip-cert-verify 全部 false（mihomo 对 anytls 默认不校验 TLS）
+# ============================================================
+proxies:
+- {name: SG-01, type: anytls, server: sg.lyhycloud.org, port: 12002, password: YOUR_NODE_PASSWORD, udp: true, alpn: [h2, http/1.1], sni: www.bing.com, skip-cert-verify: false}
+- {name: SG-02, type: anytls, server: sg.lyhycloud.org, port: 12002, password: YOUR_NODE_PASSWORD, udp: true, alpn: [h2, http/1.1], sni: www.bing.com, skip-cert-verify: false}
+- {name: USA-01, type: anytls, server: usa.lyhycloud.org, port: 12003, password: YOUR_NODE_PASSWORD, udp: true, alpn: [h2, http/1.1], sni: www.bing.com, skip-cert-verify: false}
+- {name: USA-02, type: anytls, server: usa.lyhycloud.org, port: 12003, password: YOUR_NODE_PASSWORD, udp: true, alpn: [h2, http/1.1], sni: www.bing.com, skip-cert-verify: false}
+- {name: HK-01, type: anytls, server: hk.lyhycloud.org, port: 12005, password: YOUR_NODE_PASSWORD, udp: true, alpn: [h2, http/1.1], sni: www.bing.com, skip-cert-verify: false}
+- {name: HK-02, type: anytls, server: hk.lyhycloud.org, port: 12005, password: YOUR_NODE_PASSWORD, udp: true, alpn: [h2, http/1.1], sni: www.bing.com, skip-cert-verify: false}
+- {name: JP-01, type: anytls, server: jp.lyhycloud.org, port: 12006, password: YOUR_NODE_PASSWORD, udp: true, alpn: [h2, http/1.1], sni: www.bing.com, skip-cert-verify: false}
+- {name: JP-02, type: anytls, server: jp.lyhycloud.org, port: 12006, password: YOUR_NODE_PASSWORD, udp: true, alpn: [h2, http/1.1], sni: www.bing.com, skip-cert-verify: false}
+- {name: AU-01, type: anytls, server: au.lyhycloud.org, port: 12001, password: YOUR_NODE_PASSWORD, udp: true, alpn: [h2, http/1.1], sni: www.bing.com, skip-cert-verify: false}
+- {name: AU-02, type: anytls, server: au.lyhycloud.org, port: 12001, password: YOUR_NODE_PASSWORD, udp: true, alpn: [h2, http/1.1], sni: www.bing.com, skip-cert-verify: false}
+- {name: LU-01, type: anytls, server: lu.lyhycloud.org, port: 12004, password: YOUR_NODE_PASSWORD, udp: true, alpn: [h2, http/1.1], sni: www.bing.com, skip-cert-verify: false}
+- {name: LU-02, type: anytls, server: lu.lyhycloud.org, port: 12004, password: YOUR_NODE_PASSWORD, udp: true, alpn: [h2, http/1.1], sni: www.bing.com, skip-cert-verify: false}
+- {name: UK-01, type: anytls, server: uk.lyhycloud.org, port: 12007, password: YOUR_NODE_PASSWORD, udp: true, alpn: [h2, http/1.1], sni: www.bing.com, skip-cert-verify: false}
+
+# ============================================================
+# 远程规则集（blackmatrix7 — 每日自动更新）
+# ============================================================
+rule-providers:
+  openai-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OpenAI/OpenAI.yaml
+    path: ./ruleset/blackmatrix7/openai.yaml
+    interval: 86400
+  gemini-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Gemini/Gemini.yaml
+    path: ./ruleset/blackmatrix7/gemini.yaml
+    interval: 86400
+  claude-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Claude/Claude.yaml
+    path: ./ruleset/blackmatrix7/claude.yaml
+    interval: 86400
+  copilot-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/GithubCopilot/GithubCopilot.yaml
+    path: ./ruleset/blackmatrix7/copilot.yaml
+    interval: 86400
+  telegram-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Telegram/Telegram.yaml
+    path: ./ruleset/blackmatrix7/telegram.yaml
+    interval: 86400
+  netflix-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Netflix/Netflix.yaml
+    path: ./ruleset/blackmatrix7/netflix.yaml
+    interval: 86400
+  spotify-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Spotify/Spotify.yaml
+    path: ./ruleset/blackmatrix7/spotify.yaml
+    interval: 86400
+  discord-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Discord/Discord.list
+    path: ./ruleset/blackmatrix7/discord.yaml
+    interval: 86400
+
+# ============================================================
+# 11 层策略组
+# ============================================================
+proxy-groups:
+
+# 顶层选择器
+- name: 两元店
+  type: select
+  proxies:
+  - Google-AI
+  - AI-Proxy
+  - CF-Strict
+  - Note-Tools
+  - Dev-AI
+  - Social
+  - Dev-Svc
+  - Web3
+  - Finance
+  - Game-Media
+  - Shopping
+  - Proxy
+  - DIRECT
+
+# ① Google-AI（Gemini 全家桶）— 排除 LU/UK/JP，-02 优先
+- name: Google-AI
+  type: fallback
+  lazy: false
+  max-failed-times: 3                    # #21 连续失败 3 次自动切节点
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  proxies:
+  - SG-02
+  - USA-02
+  - SG-01
+  - USA-01
+  - AU-02
+  - AU-01
+  - HK-02
+  - HK-01
+
+# ② AI-Proxy（ChatGPT/Claude/Grok）— 排除 HK/UK，-02 优先
+- name: AI-Proxy
+  type: fallback
+  lazy: false
+  max-failed-times: 3
+  url: https://chatgpt.com/cdn-cgi/trace
+  interval: 300
+  proxies:
+  - SG-02
+  - USA-02
+  - SG-01
+  - USA-01
+  - AU-02
+  - AU-01
+  - JP-02
+  - LU-02
+  - LU-01
+
+# ③ 笔记-工具
+- name: Note-Tools
+  type: url-test
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  tolerance: 100
+  proxies:
+  - SG-02
+  - SG-01
+  - USA-02
+  - USA-01
+  - AU-02
+  - AU-01
+
+# ④ 开发者-AI
+- name: Dev-AI
+  type: url-test
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  tolerance: 100
+  proxies:
+  - SG-02
+  - SG-01
+  - USA-02
+  - USA-01
+  - AU-02
+  - AU-01
+
+# ⑤ CF-严格 — 手动选择，排除 JP-01
+- name: CF-Strict
+  type: select
+  proxies:
+  - USA-01
+  - USA-02
+  - SG-01
+  - SG-02
+  - JP-02
+  - AU-01
+  - LU-01
+
+# ⑥ 社交-通讯
+- name: Social
+  type: fallback
+  lazy: false
+  max-failed-times: 3
+  url: https://discord.com/api/v1/ping
+  interval: 120
+  proxies:
+  - SG-02
+  - USA-02
+  - HK-02
+  - SG-01
+  - USA-01
+  - JP-02
+
+# ⑦ 开发-服务
+- name: Dev-Svc
+  type: fallback
+  lazy: false
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  proxies:
+  - SG-02
+  - USA-02
+  - HK-02
+  - SG-01
+  - USA-01
+  - JP-02
+
+# ⑧ Web3
+- name: Web3
+  type: fallback
+  lazy: false
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 180
+  proxies:
+  - SG-02
+  - USA-02
+  - HK-02
+  - SG-01
+  - JP-02
+
+# ⑨ 金融-新闻
+- name: Finance
+  type: fallback
+  lazy: false
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 180
+  proxies:
+  - SG-02
+  - USA-02
+  - HK-02
+  - SG-01
+  - JP-02
+
+# ⑩ 游戏-媒体
+- name: Game-Media
+  type: fallback
+  lazy: false
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 180
+  proxies:
+  - SG-02
+  - USA-02
+  - HK-02
+  - SG-01
+  - JP-02
+
+# ⑪ 购物-时尚
+- name: Shopping
+  type: fallback
+  lazy: false
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  proxies:
+  - SG-02
+  - USA-02
+  - HK-02
+  - SG-01
+  - JP-02
+
+# 兜底通用代理 — 排除 UK
+- name: Proxy
+  type: url-test
+  url: https://www.gstatic.com/generate_204
+  interval: 180
+  tolerance: 50
+  proxies:
+  - SG-02
+  - USA-02
+  - SG-01
+  - USA-01
+  - JP-02
+  - AU-02
+  - HK-02
+  - JP-01
+  - AU-01
+  - HK-01
+
+# ============================================================
+# 规则（从上到下匹配，命中即停）
+# v5 改进：用 GEOSITE 补全覆盖面（手动域名只覆盖了 20 个，GeoSite 覆盖 200+）
+# ============================================================
+rules:
+# ====== 远程规则集（blackmatrix7）======
+- RULE-SET,gemini-direct,Google-AI
+- RULE-SET,claude-direct,AI-Proxy
+- RULE-SET,openai-direct,AI-Proxy
+- RULE-SET,copilot-direct,Dev-AI
+- RULE-SET,telegram-direct,Social
+- RULE-SET,netflix-direct,Game-Media
+- RULE-SET,spotify-direct,Game-Media
+- RULE-SET,discord-direct,Social
+
+# ====== GeoSite 规则（补全手动域名遗漏）======
+# #22 GEOSITE 覆盖 200+ 域名，手动写的只有 20 个
+- GEOSITE,openai,AI-Proxy
+- GEOSITE,anthropic,AI-Proxy
+- GEOSITE,gemini,Google-AI
+- GEOSITE,google,Google-AI               # Google 全系走 Google-AI（辅助域名全覆盖）
+- GEOSITE,youtube,Game-Media
+- GEOSITE,telegram,Social
+- GEOSITE,discord,Social
+- GEOSITE,netflix,Game-Media
+- GEOSITE,spotify,Game-Media
+- GEOSITE,github,Dev-AI
+- GEOSITE,docker,Dev-Svc
+- GEOSITE,cn,DIRECT                       # 国内全域名直连
+
+# ====== ① Google-AI（手动补充 GeoSite 未收录的新域名）======
+- DOMAIN-SUFFIX,gemini.google.com,Google-AI
+- DOMAIN-SUFFIX,generativelanguage.googleapis.com,Google-AI
+- DOMAIN-SUFFIX,aistudio.google.com,Google-AI
+- DOMAIN-SUFFIX,ai.google.dev,Google-AI
+- DOMAIN-SUFFIX,deepmind.google,Google-AI
+- DOMAIN-SUFFIX,notebooklm.google.com,Google-AI
+- DOMAIN-KEYWORD,gemini,Google-AI
+- DOMAIN-KEYWORD,notebooklm,Google-AI
+
+# ====== ② AI-服务（手动补充新域名）======
+- DOMAIN-SUFFIX,perplexity.ai,CF-Strict
+- DOMAIN-SUFFIX,mistral.ai,CF-Strict
+- DOMAIN-SUFFIX,poe.com,CF-Strict
+- DOMAIN-SUFFIX,sora.com,CF-Strict
+- DOMAIN-SUFFIX,grok.com,AI-Proxy
+- DOMAIN-SUFFIX,x.ai,AI-Proxy
+- DOMAIN-SUFFIX,cohere.com,AI-Proxy
+- DOMAIN-SUFFIX,character.ai,AI-Proxy
+- DOMAIN-KEYWORD,claude,AI-Proxy
+- DOMAIN-KEYWORD,openai,AI-Proxy
+- DOMAIN-KEYWORD,chatgpt,AI-Proxy
+
+# ====== ④ 开发者-AI ======
+- DOMAIN-SUFFIX,cursor.sh,Dev-AI
+- DOMAIN-SUFFIX,cursor.com,Dev-AI
+- DOMAIN-SUFFIX,v0.dev,Dev-AI
+- DOMAIN-SUFFIX,replit.com,Dev-AI
+- DOMAIN-SUFFIX,codeium.com,Dev-AI
+- DOMAIN-SUFFIX,huggingface.co,Dev-AI
+
+# ====== ③ 笔记-工具 ======
+- DOMAIN-SUFFIX,notion.so,Note-Tools
+- DOMAIN-SUFFIX,notion.site,Note-Tools
+- DOMAIN-SUFFIX,obsidian.md,Note-Tools
+- DOMAIN-SUFFIX,craft.do,Note-Tools
+
+# ====== ⑦ 开发-服务 ======
+- DOMAIN-SUFFIX,pypi.org,Dev-Svc
+- DOMAIN-SUFFIX,pythonhosted.org,Dev-Svc
+- DOMAIN-SUFFIX,npmjs.com,Dev-Svc
+- DOMAIN-SUFFIX,vercel.com,Dev-Svc
+- DOMAIN-SUFFIX,netlify.com,Dev-Svc
+- DOMAIN-SUFFIX,supabase.com,Dev-Svc
+
+# ====== ⑧ Web3 ======
+- DOMAIN-SUFFIX,binance.com,Web3
+- DOMAIN-SUFFIX,coinbase.com,Web3
+- DOMAIN-SUFFIX,okx.com,Web3
+- DOMAIN-SUFFIX,bybit.com,Web3
+- DOMAIN-SUFFIX,uniswap.org,Web3
+- DOMAIN-SUFFIX,metamask.io,Web3
+- DOMAIN-SUFFIX,etherscan.io,Web3
+- DOMAIN-SUFFIX,coingecko.com,Web3
+- DOMAIN-SUFFIX,coinmarketcap.com,Web3
+- DOMAIN-SUFFIX,opensea.io,Web3
+- DOMAIN-SUFFIX,dune.com,Web3
+
+# ====== ⑨ 金融-新闻 ======
+- DOMAIN-SUFFIX,tradingview.com,Finance
+- DOMAIN-SUFFIX,bloomberg.com,Finance
+- DOMAIN-SUFFIX,reuters.com,Finance
+- DOMAIN-SUFFIX,nytimes.com,Finance
+- DOMAIN-SUFFIX,wsj.com,Finance
+- DOMAIN-SUFFIX,ft.com,Finance
+- DOMAIN-SUFFIX,economist.com,Finance
+- DOMAIN-SUFFIX,arxiv.org,Finance
+- DOMAIN-SUFFIX,nature.com,Finance
+
+# ====== ⑩ 游戏-媒体（GeoSite 已覆盖大部分，这里补手动遗漏）======
+- DOMAIN-SUFFIX,steampowered.com,Game-Media
+- DOMAIN-SUFFIX,steamcommunity.com,Game-Media
+- DOMAIN-SUFFIX,epicgames.com,Game-Media
+- DOMAIN-SUFFIX,disneyplus.com,Game-Media
+- DOMAIN-SUFFIX,hbomax.com,Game-Media
+- DOMAIN-SUFFIX,primevideo.com,Game-Media
+- DOMAIN-SUFFIX,hulu.com,Game-Media
+- DOMAIN-SUFFIX,max.com,Game-Media
+- DOMAIN-SUFFIX,crunchyroll.com,Game-Media
+
+# ====== ⑪ 购物-时尚 ======
+- DOMAIN-SUFFIX,amazon.com,Shopping
+- DOMAIN-SUFFIX,amazon.co.jp,Shopping
+- DOMAIN-SUFFIX,ebay.com,Shopping
+- DOMAIN-SUFFIX,shein.com,Shopping
+- DOMAIN-SUFFIX,zara.com,Shopping
+- DOMAIN-SUFFIX,figma.com,Shopping
+- DOMAIN-SUFFIX,canva.com,Shopping
+
+# ====== 通用社交（GeoSite 未覆盖的新平台）======
+- DOMAIN-KEYWORD,twitter,Proxy
+- DOMAIN-SUFFIX,x.com,Proxy
+- DOMAIN-SUFFIX,twimg.com,Proxy
+- DOMAIN-KEYWORD,instagram,Proxy
+- DOMAIN-KEYWORD,facebook,Proxy
+- DOMAIN-SUFFIX,fb.me,Proxy
+- DOMAIN-SUFFIX,fbcdn.net,Proxy
+- DOMAIN-SUFFIX,tiktok.com,Proxy
+- DOMAIN-SUFFIX,reddit.com,Proxy
+- DOMAIN-SUFFIX,redd.it,Proxy
+
+# ====== 广告拦截（v5 收尾：用 GEOSITE 全量广告拦截）======
+- GEOSITE,category-ads-all,REJECT
+
+# ====== Apple 服务 — 国区直连 ======
+- DOMAIN-SUFFIX,apple.com,DIRECT
+- DOMAIN-SUFFIX,icloud.com,DIRECT
+- DOMAIN-SUFFIX,icloud-content.com,DIRECT
+- DOMAIN-SUFFIX,mzstatic.com,DIRECT
+- DOMAIN-SUFFIX,apple-cloudkit.com,DIRECT
+- DOMAIN-SUFFIX,apple-dns.net,DIRECT
+
+# ====== Microsoft 服务 — 国区直连 ======
+- DOMAIN-SUFFIX,microsoft.com,DIRECT
+- DOMAIN-SUFFIX,windowsupdate.com,DIRECT
+- DOMAIN-SUFFIX,office.com,DIRECT
+- DOMAIN-SUFFIX,office365.com,DIRECT
+- DOMAIN-SUFFIX,live.com,DIRECT
+- DOMAIN-SUFFIX,msftauth.net,DIRECT
+
+# ====== GitHub CDN — 走开发服务 ======
+- DOMAIN-SUFFIX,github.io,Dev-Svc
+- DOMAIN-SUFFIX,githubassets.com,Dev-Svc
+- DOMAIN-SUFFIX,github.dev,Dev-Svc
+
+# ====== Cloudflare — 走代理 ======
+- DOMAIN-SUFFIX,cloudflare.com,Proxy
+- DOMAIN-SUFFIX,cloudflareclient.com,Proxy
+- DOMAIN-SUFFIX,workers.dev,Proxy
+
+# ====== Tailscale — 直连（mesh VPN 直连更优）======
+- DOMAIN-SUFFIX,tailscale.com,DIRECT
+- DOMAIN-SUFFIX,tailscale.io,DIRECT
+
+# ====== Steam — 国区直连（CDN 有国内镜像）======
+- DOMAIN-SUFFIX,steamcontent.com,DIRECT
+- DOMAIN-SUFFIX,steampowered.com.chn,DIRECT
+
+# ====== Line / Pixiv ======
+- DOMAIN-SUFFIX,line.me,Social
+- DOMAIN-SUFFIX,line-apps.com,Social
+- DOMAIN-SUFFIX,pixiv.net,Proxy
+
+# ====== GeoIP CN 直连 ======
+- GEOIP,CN,DIRECT
+
+# ====== 兜底走代理 ======
+- MATCH,Proxy
+
+hosts: {}

@@ -1,0 +1,46 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="clash-ai-proxy",
+    version="2.0.0",
+    description="Test which proxy nodes can reach AI services (ChatGPT, Claude, Gemini) — and generate an optimized layered Clash/Shadowrocket config.",
+    long_description=open("README.md", encoding="utf-8").read(),
+    long_description_content_type="text/markdown",
+    author="Freya",
+    author_email="brendahao1998@gmail.com",
+    url="https://github.com/MiLab-Bit/clash-ai-proxy",
+    license="MIT",
+    python_requires=">=3.8",
+    packages=find_packages(),
+    install_requires=[
+        "requests>=2.28",
+        "PyYAML>=6.0",
+    ],
+    entry_points={
+        "console_scripts": [
+            "clash-ai=clash_ai_proxy.cli:main",
+        ],
+    },
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+        "Operating System :: Microsoft :: Windows",
+        "Operating System :: POSIX :: Linux",
+        "Operating System :: MacOS :: MacOS X",
+        "Topic :: Internet :: Proxy Servers",
+        "Topic :: Internet",
+        "Topic :: Software Development :: Testing",
+        "Topic :: System :: Networking",
+        "Intended Audience :: Developers",
+        "Intended Audience :: System Administrators",
+        "Development Status :: 4 - Beta",
+    ],
+    keywords="clash proxy ai chatgpt gemini claude openai shadowrocket mihomo vpn config clash-rules",
+)

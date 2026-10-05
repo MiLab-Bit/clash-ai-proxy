@@ -1,0 +1,490 @@
+# ============================================================
+# OneMi — AI Proxy for Windows / Clash Verge Rev
+# 内部版本 1.1 | 2026-10-05
+# 11 层 AI 分流架构 / MRS 原生规则集 / proxy-providers 自动订阅
+# 适用：Windows 11 + Clash Verge Rev (mihomo 内核)
+# 使用方法：Clash Verge → 配置 → 新建 → 粘贴或导入此文件
+# ⚠️ listen 端口 1053（避开系统 DNS 53 冲突）
+# ⚠️ find-process-mode: off（strict 会误伤 svchost 等系统进程）
+# ============================================================
+mode: rule
+mixed-port: 7897
+allow-lan: false
+log-level: warning
+ipv6: false
+external-controller: 127.0.0.1:9097
+secret: YOUR_WIN_DASHBOARD_SECRET
+unified-delay: true
+tcp-concurrent: true
+geodata-mode: true
+geox-url:
+  geoip: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip.dat
+  geosite: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite.dat
+  mmdb: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/country.mmdb
+geo-auto-update: true
+geo-update-interval: 168
+keep-alive-interval: 30
+global-client-fingerprint: chrome
+tun:
+  enable: true
+  stack: gvisor
+  auto-route: true
+  strict-route: true
+  auto-detect-interface: true
+  dns-hijack:
+  - any:53
+  - tcp://any:53
+sniffer:
+  enable: true
+  force-dns-mapping: true
+  parse-pure-ip: false
+  override-destination: false
+  sniff:
+    TLS:
+      ports:
+      - 443
+      - 8443
+    HTTP:
+      ports:
+      - 80
+      - 8080-8880
+    QUIC:
+      ports:
+      - 443
+      - 8443
+  skip-domain:
+  - +.bank.example
+  - +.icbc.com.cn
+  - +.cmbchina.com
+  - +.bankcomm.com
+  - Mijia Cloud
+  - +.apple.com
+  - +.icloud.com
+dns:
+  enable: true
+  listen: 127.0.0.1:1053            # Windows 评审: 53 撞系统 DNS，改 1053
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter-mode: blacklist
+  prefer-h3: false
+  respect-rules: true
+  use-hosts: true
+  use-system-hosts: false
+  cache-algorithm: arc
+  fake-ip-filter:
+  - '*.lan'
+  - '*.local'
+  - '*.arpa'
+  - time.*.com
+  - ntp.*.com
+  - +.market.xiaomi.com
+  - localhost.ptlogin2.qq.com
+  - '*.msftncsi.com'
+  - www.msftconnecttest.com
+  - +.googleapis.com
+  - +.googleusercontent.com
+  - +.ggpht.com
+  - +.play.google.com
+  - +.android.clients.google.com
+  - +.connectivitycheck.gstatic.com
+  - +.samsung.com
+  - +.samsungcloud.com
+  - +.securesamsungcloud.com
+  default-nameserver:
+  - 119.29.29.29
+  - 223.5.5.5
+  nameserver:
+  - https://doh.pub/dns-query
+  - https://dns.alidns.com/dns-query
+  fallback:
+  - https://dns.google/dns-query
+  - https://1.1.1.1/dns-query
+  nameserver-policy:
+    geosite:cn:
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+    geosite:google:
+    - https://dns.google/dns-query
+    geosite:openai:
+    - https://dns.google/dns-query
+    geosite:anthropic:
+    - https://dns.google/dns-query
+    geosite:gemini:
+    - https://dns.google/dns-query
+    geosite:apple:
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+    geosite:microsoft:
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+    geosite:category-ads-all: rcode://success
+  proxy-server-nameserver:
+  - https://doh.pub/dns-query
+  - https://dns.alidns.com/dns-query
+  direct-nameserver:
+  - https://doh.pub/dns-query
+  - https://dns.alidns.com/dns-query
+  direct-nameserver-follow-policy: true
+  fallback-filter:
+    geoip: true
+    geoip-code: CN
+    ipcidr:
+    - 240.0.0.0/4
+    - 100.64.0.0/10               # v5.6: 补 CGNAT 网段
+    # v1.1: 删 0.0.0.0/32（纯噪音 IP，不会出现在真实解析中）
+profile:
+  store-selected: true
+  store-fake-ip: true
+rule-providers:
+  geosite-ai:
+    type: http
+    behavior: classical
+    format: mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ai-chat-!cn.mrs
+    path: ./ruleset/meta/geosite-ai.mrs
+    interval: 86400
+  geosite-cn:
+    type: http
+    behavior: classical
+    format: mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.mrs
+    path: ./ruleset/meta/geosite-cn.mrs
+    interval: 86400
+  geosite-ads:
+    type: http
+    behavior: classical
+    format: mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ads-all.mrs
+    path: ./ruleset/meta/geosite-ads.mrs
+    interval: 86400
+  geoip-cn:
+    type: http
+    behavior: classical
+    format: mrs
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/cn.mrs
+    path: ./ruleset/meta/geoip-cn.mrs
+    interval: 86400
+  openai-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OpenAI/OpenAI.yaml
+    path: ./ruleset/blackmatrix7/openai.yaml
+    interval: 86400
+  gemini-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Gemini/Gemini.yaml
+    path: ./ruleset/blackmatrix7/gemini.yaml
+    interval: 86400
+  claude-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Claude/Claude.yaml
+    path: ./ruleset/blackmatrix7/claude.yaml
+    interval: 86400
+  copilot-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/GithubCopilot/GithubCopilot.yaml
+    path: ./ruleset/blackmatrix7/copilot.yaml
+    interval: 86400
+  telegram-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Telegram/Telegram.yaml
+    path: ./ruleset/blackmatrix7/telegram.yaml
+    interval: 86400
+  netflix-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Netflix/Netflix.yaml
+    path: ./ruleset/blackmatrix7/netflix.yaml
+    interval: 86400
+  spotify-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Spotify/Spotify.yaml
+    path: ./ruleset/blackmatrix7/spotify.yaml
+    interval: 86400
+  discord-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Discord/Discord.list
+    path: ./ruleset/blackmatrix7/discord.yaml
+    interval: 86400
+proxy-groups:
+- name: Google-AI
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use:
+  - fightlyd
+- name: AI-Proxy
+  type: url-test
+  lazy: true
+  url: https://chatgpt.com/cdn-cgi/trace
+  interval: 180
+  tolerance: 120
+  use:
+  - fightlyd
+- name: Note-Tools
+  type: url-test
+  lazy: true
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  tolerance: 100
+  use:
+  - fightlyd
+- name: Dev-AI
+  type: url-test
+  lazy: true
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  tolerance: 100
+  use:
+  - fightlyd
+- name: CF-Strict
+  type: select
+  use:
+  - fightlyd
+- name: Social
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://discord.com/api/v1/ping
+  interval: 300
+  use:
+  - fightlyd
+- name: Dev-Svc
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use:
+  - fightlyd
+- name: Web3
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use:
+  - fightlyd
+- name: Finance
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use:
+  - fightlyd
+- name: Game-Media
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use:
+  - fightlyd
+- name: Shopping
+  type: fallback
+  lazy: true
+  max-failed-times: 3
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use:
+  - fightlyd
+- name: Proxy
+  type: url-test
+  lazy: true
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  tolerance: 80
+  use:
+  - fightlyd
+rules:
+- IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+- IP-CIDR,10.0.0.0/8,DIRECT,no-resolve
+- IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
+- IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+- IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
+- GEOIP,private,DIRECT,no-resolve
+- RULE-SET,gemini-direct,Google-AI
+- RULE-SET,claude-direct,AI-Proxy
+- RULE-SET,openai-direct,AI-Proxy
+- RULE-SET,copilot-direct,Dev-AI
+- RULE-SET,telegram-direct,Social
+- RULE-SET,netflix-direct,Game-Media
+- RULE-SET,spotify-direct,Game-Media
+- RULE-SET,discord-direct,Social
+- GEOSITE,openai,AI-Proxy
+- GEOSITE,anthropic,AI-Proxy
+- GEOSITE,gemini,Google-AI
+- GEOSITE,google,Google-AI
+- GEOSITE,youtube,Game-Media
+- GEOSITE,telegram,Social
+- GEOSITE,discord,Social
+- GEOSITE,netflix,Game-Media
+- GEOSITE,spotify,Game-Media
+- GEOSITE,github,Dev-AI
+- GEOSITE,docker,Dev-Svc
+- DOMAIN-SUFFIX,gemini.google.com,Google-AI
+- DOMAIN-SUFFIX,generativelanguage.googleapis.com,Google-AI
+- DOMAIN-SUFFIX,aistudio.google.com,Google-AI
+- DOMAIN-SUFFIX,ai.google.dev,Google-AI
+- DOMAIN-SUFFIX,deepmind.google,Google-AI
+- DOMAIN-SUFFIX,notebooklm.google.com,Google-AI
+- DOMAIN-SUFFIX,perplexity.ai,CF-Strict
+- DOMAIN-SUFFIX,mistral.ai,CF-Strict
+- DOMAIN-SUFFIX,poe.com,CF-Strict
+- DOMAIN-SUFFIX,sora.com,CF-Strict
+- DOMAIN-SUFFIX,grok.com,AI-Proxy
+- DOMAIN-SUFFIX,x.ai,AI-Proxy
+- DOMAIN-SUFFIX,cohere.com,AI-Proxy
+- DOMAIN-SUFFIX,character.ai,AI-Proxy
+- DOMAIN-SUFFIX,oaistatic.com,AI-Proxy
+- DOMAIN-SUFFIX,openaiassets.com,AI-Proxy
+- DOMAIN-SUFFIX,oaiusercontent.com,AI-Proxy
+- DOMAIN-SUFFIX,files.chatgpt.com,AI-Proxy
+- DOMAIN-SUFFIX,anthropicusercontent.com,AI-Proxy
+- DOMAIN-SUFFIX,claudeusercontent.com,AI-Proxy
+- DOMAIN-SUFFIX,cdn.anthropic.com,AI-Proxy
+- DOMAIN-SUFFIX,static.claude.ai,AI-Proxy
+- DOMAIN-SUFFIX,cursor.sh,Dev-AI
+- DOMAIN-SUFFIX,cursor.com,Dev-AI
+- DOMAIN-SUFFIX,v0.dev,Dev-AI
+- DOMAIN-SUFFIX,replit.com,Dev-AI
+- DOMAIN-SUFFIX,codeium.com,Dev-AI
+- DOMAIN-SUFFIX,huggingface.co,Dev-AI
+- DOMAIN-SUFFIX,notion.so,Note-Tools
+- DOMAIN-SUFFIX,notion.site,Note-Tools
+- DOMAIN-SUFFIX,obsidian.md,Note-Tools
+- DOMAIN-SUFFIX,craft.do,Note-Tools
+- DOMAIN-SUFFIX,pypi.org,Dev-Svc
+- DOMAIN-SUFFIX,pythonhosted.org,Dev-Svc
+- DOMAIN-SUFFIX,npmjs.com,Dev-Svc
+- DOMAIN-SUFFIX,vercel.com,Dev-Svc
+- DOMAIN-SUFFIX,netlify.com,Dev-Svc
+- DOMAIN-SUFFIX,supabase.com,Dev-Svc
+- DOMAIN-SUFFIX,binance.com,Web3
+- DOMAIN-SUFFIX,coinbase.com,Web3
+- DOMAIN-SUFFIX,okx.com,Web3
+- DOMAIN-SUFFIX,bybit.com,Web3
+- DOMAIN-SUFFIX,uniswap.org,Web3
+- DOMAIN-SUFFIX,metamask.io,Web3
+- DOMAIN-SUFFIX,etherscan.io,Web3
+- DOMAIN-SUFFIX,coingecko.com,Web3
+- DOMAIN-SUFFIX,coinmarketcap.com,Web3
+- DOMAIN-SUFFIX,opensea.io,Web3
+- DOMAIN-SUFFIX,dune.com,Web3
+- DOMAIN-SUFFIX,tradingview.com,Finance
+- DOMAIN-SUFFIX,bloomberg.com,Finance
+- DOMAIN-SUFFIX,reuters.com,Finance
+- DOMAIN-SUFFIX,nytimes.com,Finance
+- DOMAIN-SUFFIX,wsj.com,Finance
+- DOMAIN-SUFFIX,ft.com,Finance
+- DOMAIN-SUFFIX,economist.com,Finance
+- DOMAIN-SUFFIX,arxiv.org,Dev-AI
+- DOMAIN-SUFFIX,nature.com,Dev-AI
+- DOMAIN-SUFFIX,steampowered.com,Game-Media
+- DOMAIN-SUFFIX,steamcommunity.com,Game-Media
+- DOMAIN-SUFFIX,epicgames.com,Game-Media
+- DOMAIN-SUFFIX,disneyplus.com,Game-Media
+- DOMAIN-SUFFIX,hbomax.com,Game-Media
+- DOMAIN-SUFFIX,primevideo.com,Game-Media
+- DOMAIN-SUFFIX,hulu.com,Game-Media
+- DOMAIN-SUFFIX,max.com,Game-Media
+- DOMAIN-SUFFIX,crunchyroll.com,Game-Media
+- DOMAIN-SUFFIX,amazon.com,Shopping
+- DOMAIN-SUFFIX,amazon.co.jp,Shopping
+- DOMAIN-SUFFIX,ebay.com,Shopping
+- DOMAIN-SUFFIX,shein.com,Shopping
+- DOMAIN-SUFFIX,zara.com,Shopping
+- DOMAIN-SUFFIX,figma.com,Shopping
+- DOMAIN-SUFFIX,canva.com,Shopping
+- DOMAIN-SUFFIX,x.com,Proxy
+- DOMAIN-SUFFIX,twimg.com,Proxy
+- DOMAIN-SUFFIX,api.twitter.com,Proxy
+- DOMAIN-SUFFIX,instagram.com,Proxy
+- DOMAIN-SUFFIX,fb.me,Proxy
+- DOMAIN-SUFFIX,fbcdn.net,Proxy
+- DOMAIN-SUFFIX,tiktok.com,Proxy
+- DOMAIN-SUFFIX,reddit.com,Proxy
+- DOMAIN-SUFFIX,redd.it,Proxy
+- GEOSITE,apple,DIRECT
+- GEOSITE,icloud,DIRECT
+- GEOSITE,microsoft,DIRECT
+- DOMAIN-SUFFIX,apple.com,DIRECT
+- DOMAIN-SUFFIX,icloud.com,DIRECT
+- DOMAIN-SUFFIX,icloud-content.com,DIRECT
+- DOMAIN-SUFFIX,mzstatic.com,DIRECT
+- DOMAIN-SUFFIX,apple-cloudkit.com,DIRECT
+- DOMAIN-SUFFIX,apple-dns.net,DIRECT
+- DOMAIN-SUFFIX,apps.apple.com,DIRECT
+- DOMAIN-SUFFIX,ocsp.apple.com,DIRECT
+- DOMAIN-SUFFIX,valid.apple.com,DIRECT
+- DOMAIN-SUFFIX,microsoft.com,DIRECT
+- DOMAIN-SUFFIX,microsoftonline.com,DIRECT
+- DOMAIN-SUFFIX,office.com,DIRECT
+- DOMAIN-SUFFIX,office365.com,DIRECT
+- DOMAIN-SUFFIX,live.com,DIRECT
+- DOMAIN-SUFFIX,windows.net,DIRECT
+- DOMAIN-SUFFIX,msftauth.net,DIRECT
+- DOMAIN-SUFFIX,windowsupdate.com,DIRECT
+- DOMAIN-SUFFIX,skydrive.wns.windows.com,DIRECT
+- DOMAIN-SUFFIX,config.edge.skype.com,DIRECT
+- GEOSITE,cn,DIRECT
+- DOMAIN-SUFFIX,github.io,Dev-AI
+- DOMAIN-SUFFIX,githubassets.com,Dev-AI
+- DOMAIN-SUFFIX,github.dev,Dev-AI
+- DOMAIN-SUFFIX,cloudflare.com,Proxy
+- DOMAIN-SUFFIX,workers.dev,Proxy
+- DOMAIN-SUFFIX,pages.dev,Proxy
+- DOMAIN-SUFFIX,tailscale.com,DIRECT
+- DOMAIN-SUFFIX,tailscale.io,DIRECT
+- DOMAIN-SUFFIX,steamcontent.com,DIRECT
+- DOMAIN-SUFFIX,steamstatic.com,DIRECT
+- DOMAIN-SUFFIX,steamcdn-a.akamaihd.net,DIRECT
+- DOMAIN-SUFFIX,steam-chat.com,DIRECT
+- DOMAIN-SUFFIX,line.me,Proxy
+- DOMAIN-SUFFIX,line-apps.com,Proxy
+- DOMAIN-SUFFIX,naver.jp,Proxy
+- DOMAIN-SUFFIX,pixiv.net,Proxy
+- DOMAIN-SUFFIX,pximg.net,Proxy
+- DOMAIN-SUFFIX,samsung.com.cn,DIRECT
+- DOMAIN-SUFFIX,samsung.com,DIRECT
+- DOMAIN-SUFFIX,samsungdns.com,DIRECT
+- DOMAIN-SUFFIX,bspg.samsung-pp.com,DIRECT
+- RULE-SET,geosite-ai,AI-Proxy
+- GEOIP,CN,DIRECT,no-resolve
+- GEOSITE,category-ads-all,REJECT
+- MATCH,Proxy
+hosts: {}
+bind-address: '*'
+external-controller-pipe: \\.\pipe\verge-mihomo
+external-controller-cors:
+  allow-private-network: true
+  allow-origins:
+  - tauri://localhost
+  - http://tauri.localhost
+  - https://yacd.metacubex.one
+  - https://metacubex.github.io
+  - https://board.zash.run.place
+find-process-mode: 'off'           # Windows 评审: strict 会误伤 svchost/杀毒/更新，改 off
+proxy-providers:
+  fightlyd:
+    type: http
+    url: https://www.fightlyd.site/api/v1/client/subscribe?token=YOUR_SUBSCRIBE_TOKEN
+    interval: 86400
+    path: ./proxy_providers/fightlyd.yaml
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+    filter: SG-|USA-|HK-|JP-|AU-|LU-|UK-
+    override:
+      skip-cert-verify: false

@@ -1,0 +1,319 @@
+# Clash Verge / mihomo Template — 11-Layer AI-Optimized Architecture
+# v1.1.0 — battle-tested with real airports
+#
+# Usage:
+#   1. Replace the ENTIRE proxies: section with your subscription nodes
+#   2. Update node names in proxy-groups to match your actual nodes
+#   3. Or use: clash-ai full --config your-sub.yaml --proxy http://127.0.0.1:7897
+#
+# Key optimizations (see docs/pitfalls.md for details):
+#   - lazy: false → connections stay warm (fixes anytls cold start)
+#   - fake-ip-filter → AI domains use real DNS (prevents detection)
+#   - rule-providers → blackmatrix7 remote rulesets (daily auto-update)
+#   - IPv6 disabled → prevents leaks on airports without IPv6
+#   - -02 nodes first → proven lower jitter in practice
+#   - greedy keyword fix → service rules BEFORE DOMAIN-KEYWORD,google
+
+mixed-port: 7890
+mode: rule
+log-level: info
+ipv6: false
+external-controller: 127.0.0.1:9090
+
+dns:
+  enable: true
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - +.openai.com
+    - +.chatgpt.com
+    - +.anthropic.com
+    - +.claude.ai
+    - +.gemini.google.com
+    - +.generativelanguage.googleapis.com
+    - +.netflix.com
+    - +.nflxvideo.net
+    - +.disneyplus.com
+    - rule-set:fakeip-filter/system
+  nameserver:
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+  fallback:
+    - https://1.1.1.1/dns-query
+    - https://dns.google/dns-query
+  fallback-filter:
+    geoip: true
+    geoip-code: CN
+
+# === Replace this with your actual nodes ===
+proxies:
+  - name: "PLACEHOLDER-SG-01"
+    type: ss
+    server: example.com
+    port: 443
+    cipher: aes-256-gcm
+    password: "your-password"
+
+# === Rule Providers (blackmatrix7 remote rulesets — daily auto-update) ===
+rule-providers:
+  openai-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OpenAI/OpenAI.yaml
+    path: ./ruleset/blackmatrix7/openai.yaml
+    interval: 86400
+  gemini-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Gemini/Gemini.yaml
+    path: ./ruleset/blackmatrix7/gemini.yaml
+    interval: 86400
+  claude-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Claude/Claude.yaml
+    path: ./ruleset/blackmatrix7/claude.yaml
+    interval: 86400
+  copilot-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/GithubCopilot/GithubCopilot.yaml
+    path: ./ruleset/blackmatrix7/copilot.yaml
+    interval: 86400
+  telegram-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Telegram/Telegram.yaml
+    path: ./ruleset/blackmatrix7/telegram.yaml
+    interval: 86400
+  netflix-direct:
+    type: http
+    behavior: classical
+    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Netflix/Netflix.yaml
+    path: ./ruleset/blackmatrix7/netflix.yaml
+    interval: 86400
+
+# === 11-Layer Proxy Groups ===
+proxy-groups:
+  # Layer 1: Google AI (Gemini) — exclude LU/UK, -02 priority
+  - name: Google-AI
+    type: fallback
+    lazy: false
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    proxies:
+      # -02 nodes first (proven lower jitter)
+      - PLACEHOLDER-SG-02
+      - PLACEHOLDER-USA-02
+      # Others (excluding LU/UK)
+      - PLACEHOLDER-SG-01
+      - PLACEHOLDER-USA-01
+      - PLACEHOLDER-JP-02
+
+  # Layer 2: AI Services (ChatGPT/Claude/Grok) — exclude HK/UK, -02 priority
+  - name: AI-Services
+    type: fallback
+    lazy: false
+    url: https://chatgpt.com/cdn-cgi/trace
+    interval: 300
+    proxies:
+      - PLACEHOLDER-SG-02
+      - PLACEHOLDER-USA-02
+      - PLACEHOLDER-SG-01
+      - PLACEHOLDER-USA-01
+      - PLACEHOLDER-JP-02
+
+  # Layer 3: CF-Strict (Cloudflare Bot Management) — manual select
+  - name: CF-Strict
+    type: select
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    proxies:
+      - PLACEHOLDER-SG-02
+      - PLACEHOLDER-USA-02
+      - PLACEHOLDER-USA-01
+
+  # Layer 4: Dev AI (Cursor/Copilot) — low stakes, url-test OK
+  - name: Dev-AI
+    type: url-test
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+    proxies:
+      - PLACEHOLDER-SG-01
+      - PLACEHOLDER-SG-02
+      - PLACEHOLDER-USA-01
+
+  # Layer 5: Social — fallback, -02 priority
+  - name: Social
+    type: fallback
+    lazy: false
+    url: https://discord.com/api/v1/ping
+    interval: 120
+    proxies:
+      - PLACEHOLDER-SG-02
+      - PLACEHOLDER-USA-02
+      - PLACEHOLDER-SG-01
+      - PLACEHOLDER-USA-01
+
+  # Layer 6: Dev Services — fallback, high frequency
+  - name: Dev-Svc
+    type: fallback
+    lazy: false
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    proxies:
+      - PLACEHOLDER-SG-02
+      - PLACEHOLDER-USA-02
+      - PLACEHOLDER-SG-01
+      - PLACEHOLDER-USA-01
+
+  # Layer 7: Web3 — fallback, -02 priority
+  - name: Web3
+    type: fallback
+    lazy: false
+    url: https://www.gstatic.com/generate_204
+    interval: 180
+    proxies:
+      - PLACEHOLDER-SG-02
+      - PLACEHOLDER-USA-02
+      - PLACEHOLDER-SG-01
+
+  # Layer 8: Finance
+  - name: Finance
+    type: fallback
+    lazy: false
+    url: https://www.gstatic.com/generate_204
+    interval: 180
+    proxies:
+      - PLACEHOLDER-SG-02
+      - PLACEHOLDER-USA-02
+      - PLACEHOLDER-SG-01
+
+  # Layer 9: Streaming — fallback for session continuity
+  - name: Streaming
+    type: fallback
+    lazy: false
+    url: https://www.youtube.com
+    interval: 180
+    proxies:
+      - PLACEHOLDER-SG-02
+      - PLACEHOLDER-USA-02
+      - PLACEHOLDER-SG-01
+
+  # Layer 10: Shopping
+  - name: Shopping
+    type: fallback
+    lazy: false
+    url: https://www.gstatic.com/generate_204
+    interval: 180
+    proxies:
+      - PLACEHOLDER-SG-02
+      - PLACEHOLDER-USA-02
+      - PLACEHOLDER-SG-01
+
+  # Layer 11: Proxy (catch-all) — exclude UK/Warp
+  - name: Proxy
+    type: url-test
+    url: https://www.gstatic.com/generate_204
+    interval: 180
+    tolerance: 50
+    proxies:
+      - PLACEHOLDER-SG-01
+      - PLACEHOLDER-SG-02
+      - PLACEHOLDER-USA-01
+
+# === Rules ===
+# Order matters! Specific DOMAIN-SUFFIX rules MUST come before greedy KEYWORD rules.
+rules:
+  # Remote rulesets (blackmatrix7)
+  - RULE-SET,gemini-direct,Google-AI
+  - RULE-SET,claude-direct,AI-Services
+  - RULE-SET,openai-direct,AI-Services
+  - RULE-SET,copilot-direct,Dev-AI
+  - RULE-SET,telegram-direct,Social
+  - RULE-SET,netflix-direct,Streaming
+
+  # Google AI — auxiliary domains BEFORE greedy keyword
+  - DOMAIN-SUFFIX,gemini.google.com,Google-AI
+  - DOMAIN-SUFFIX,generativelanguage.googleapis.com,Google-AI
+  - DOMAIN-SUFFIX,aistudio.google.com,Google-AI
+  - DOMAIN-SUFFIX,bard.google.com,Google-AI
+  - DOMAIN-SUFFIX,ai.google.dev,Google-AI
+  - DOMAIN-SUFFIX,deepmind.google,Google-AI
+  - DOMAIN-SUFFIX,notebooklm.google.com,Google-AI
+  - DOMAIN-SUFFIX,accounts.google.com,Google-AI
+  - DOMAIN-SUFFIX,www.gstatic.com,Google-AI
+  - DOMAIN-SUFFIX,ssl.gstatic.com,Google-AI
+  - DOMAIN-SUFFIX,lh3.googleusercontent.com,Google-AI
+  - DOMAIN-KEYWORD,gemini,Google-AI
+
+  # AI Services
+  - DOMAIN-SUFFIX,claude.ai,AI-Services
+  - DOMAIN-SUFFIX,anthropic.com,AI-Services
+  - DOMAIN-SUFFIX,openai.com,AI-Services
+  - DOMAIN-SUFFIX,chatgpt.com,AI-Services
+  - DOMAIN-SUFFIX,oaistatic.com,AI-Services
+  - DOMAIN-SUFFIX,oaiusercontent.com,AI-Services
+  - DOMAIN-SUFFIX,x.ai,AI-Services
+  - DOMAIN-SUFFIX,grok.com,AI-Services
+  - DOMAIN-SUFFIX,perplexity.ai,CF-Strict
+  - DOMAIN-SUFFIX,mistral.ai,CF-Strict
+  - DOMAIN-SUFFIX,poe.com,CF-Strict
+  - DOMAIN-SUFFIX,cohere.com,AI-Services
+  - DOMAIN-SUFFIX,character.ai,AI-Services
+
+  # Dev AI
+  - DOMAIN-SUFFIX,cursor.com,Dev-AI
+  - DOMAIN-SUFFIX,cursor.sh,Dev-AI
+  - DOMAIN-SUFFIX,githubcopilot.com,Dev-AI
+  - DOMAIN-SUFFIX,replit.com,Dev-AI
+
+  # Social
+  - DOMAIN-SUFFIX,telegram.org,Social
+  - DOMAIN-SUFFIX,t.me,Social
+  - DOMAIN-SUFFIX,discord.com,Social
+  - DOMAIN-SUFFIX,discordapp.com,Social
+  - DOMAIN-SUFFIX,whatsapp.com,Social
+  - DOMAIN-SUFFIX,x.com,Social
+  - DOMAIN-SUFFIX,twimg.com,Social
+
+  # Dev Services
+  - DOMAIN-SUFFIX,github.com,Dev-Svc
+  - DOMAIN-SUFFIX,githubusercontent.com,Dev-Svc
+  - DOMAIN-SUFFIX,docker.com,Dev-Svc
+  - DOMAIN-SUFFIX,docker.io,Dev-Svc
+  - DOMAIN-SUFFIX,pypi.org,Dev-Svc
+  - DOMAIN-SUFFIX,npmjs.com,Dev-Svc
+  - DOMAIN-SUFFIX,vercel.com,Dev-Svc
+
+  # Streaming
+  - DOMAIN-SUFFIX,netflix.com,Streaming
+  - DOMAIN-SUFFIX,nflxvideo.net,Streaming
+  - DOMAIN-SUFFIX,disneyplus.com,Streaming
+  - DOMAIN-SUFFIX,youtube.com,Streaming
+  - DOMAIN-SUFFIX,ytimg.com,Streaming
+  - DOMAIN-SUFFIX,googlevideo.com,Streaming
+  - DOMAIN-SUFFIX,spotify.com,Streaming
+  - DOMAIN-SUFFIX,scdn.co,Streaming
+  - DOMAIN-SUFFIX,primevideo.com,Streaming
+  - DOMAIN-SUFFIX,hbomax.com,Streaming
+  - DOMAIN-SUFFIX,crunchyroll.com,Streaming
+
+  # Web3
+  - DOMAIN-SUFFIX,binance.com,Web3
+  - DOMAIN-SUFFIX,coinbase.com,Web3
+  - DOMAIN-SUFFIX,opensea.io,Web3
+  - DOMAIN-SUFFIX,etherscan.io,Web3
+
+  # Common Google — AFTER service-specific rules (greedy keyword captures all)
+  - DOMAIN-KEYWORD,google,Proxy
+  - DOMAIN-SUFFIX,google.com,Proxy
+  - DOMAIN-SUFFIX,googleapis.com,Proxy
+
+  # China direct
+  - GEOIP,CN,DIRECT
+
+  # Final fallback
+  - MATCH,Proxy

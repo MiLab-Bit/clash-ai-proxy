@@ -1,0 +1,13 @@
+# 敏感文件 — 含真实凭证的配置不提交
+*-real.yaml
+*-real.conf
+*-secret.yaml
+.env
+*.token
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+# 临时脚本
+push_*.py
+gen_onemi.py
