@@ -2,6 +2,8 @@
 
 **One config, three devices. AI-first proxy architecture for Clash Verge / ClashMeta / Shadowrocket.**
 
+> **English** | [中文](README_CN.md)
+
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Version 2.0.0](https://img.shields.io/badge/version-2.0.0-blue.svg)](#changelog)
