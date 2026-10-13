@@ -127,9 +127,12 @@ dns:
   - https://doh.pub/dns-query
   - https://dns.alidns.com/dns-query
   direct-nameserver-follow-policy: true     # 直连 DNS 也遵守 nameserver-policy
+  # v1.7: 禁用 fallback-filter 的 geoip 判断——jsDelivr 下载 GeoIP.dat 在移动网络下频繁 EOF，
+  #        而 fallback-filter 的 geoip:true 会强制加载 GeoIP.dat 做"是否 CN IP"判断，导致核心无法启动。
+  #        CN 域名已由 nameserver-policy 的 "geosite:cn" 分流到国内 DoH，fake-ip 模式下也不依赖此判断。
+  #        只保留 ipcidr 兜底（这部分不需要 GeoIP 数据库）。
   fallback-filter:
-    geoip: true
-    geoip-code: CN
+    geoip: false                            # v1.7: 关闭 GeoIP 判断，消除对 GeoIP.dat 的依赖
     ipcidr:
     - 240.0.0.0/4
     - 100.64.0.0/10               # v5.6: 补 CGNAT 网段
