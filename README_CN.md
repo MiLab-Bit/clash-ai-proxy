@@ -4,16 +4,16 @@
 
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version 1.1](https://img.shields.io/badge/version-1.1-blue.svg)](#更新日志)
+[![Version 2.1.0](https://img.shields.io/badge/version-2.1.0-blue.svg)](#更新日志)
 
 > 📖 [English](README.md) | **中文**
 
 ```
 OneMi/
-├── OneMi-S24-ClashMeta.yaml         # 三星 S24 / 安卓 + ClashMeta
-├── OneMi-Windows-ClashVerge.yaml     # Windows + Clash Verge Rev
+├── OneMi-S24-ClashMeta.yaml         # 三星 S24 / 安卓 + ClashMeta（内置 13 个 anytls 节点）
+├── OneMi-Windows-ClashVerge.yaml     # Windows + Clash Verge Rev（基于订阅）
 ├── OneMi-iPhone-YAML.yaml            # iPhone + mihomo 内核（ProxyMD 等）
-├── OneMi-iPhone-Shadowrocket.conf    # iPhone + Shadowrocket（原生 .conf）
+├── OneMi-iPhone-Shadowrocket.conf    # iPhone + Shadowrocket（原生 .conf，13 个 anytls 节点）
 ├── clash_ai_proxy/                   # CLI 工具源码（节点测速 + 自动生成）
 ├── templates/                        # 模板文件
 ├── docs/pitfalls.md                  # 踩坑记录
@@ -45,7 +45,7 @@ OneMi 是一套**单源多端、AI 优先**的 Clash 代理配置架构。写一
 | # | 策略组 | 类型 | 覆盖服务 | 为什么单独分组 |
 |---|--------|------|----------|----------------|
 | 1 | **Google-AI** | fallback | Gemini、NotebookLM、AI Studio | Google 封禁特定 IP 段 |
-| 2 | **AI-Proxy** | url-test | ChatGPT、Claude、Grok | OpenAI 死节点检测（其他服务正常但 OpenAI 不通） |
+| 2 | **AI-Proxy** | fallback | ChatGPT、Claude、Grok | OpenAI 死节点检测（其他服务正常但 OpenAI 不通）；**必须用 `fallback` 不是 `url-test`**——自动测速会频繁跳地区，触发 OpenAI 风控（详见 v2.1.0 更新日志） |
 | 3 | **Note-Tools** | url-test | Notion、Obsidian、Craft | 低风险，选最快 |
 | 4 | **Dev-AI** | url-test | Cursor、Copilot、Replit | 低风险 |
 | 5 | **CF-Strict** | select | Perplexity、Mistral、Poe | Cloudflare Bot Management——需手动选节点 |
@@ -288,6 +288,22 @@ python gen_onemi.py
 ---
 
 ## 更新日志
+
+### v2.1.0 — 抗网络封锁 + AI-Proxy 跳地区修复（2026-10-13）
+
+当 `raw.githubusercontent.com` 和订阅源主机从国内网络无法访问时（DNS 能解析但 TCP 超时——这是网络层封锁，不是 DNS 问题），依赖这些主机的配置会完全拉不到节点和规则集，核心启动失败。本次发布让配置能抗住这种失败，同时修复了一个独立的三端通用的"跳地区"bug。
+
+| 改动 | 说明 |
+|------|------|
+| **`geox-url` 改用 jsDelivr CDN** | geoip/geosite/mmdb 三个数据库从 `cdn.jsdelivr.net` 下载（替代被墙的 `raw.githubusercontent.com`），即使 GitHub raw 被封核心也能启动 |
+| **删除 `rule-providers` 整块** | 11 个条目（4 个 MRS + 7 个 blackmatrix7）全部指向被墙的 GitHub 主机，会导致核心启动失败；AI 服务匹配改由内置 `GEOSITE` + `DOMAIN-SUFFIX` 规则兜底 |
+| **清理 10 条 `RULE-SET` 规则** | 删除引用已删规则集的所有规则；现有 GEOSITE/DOMAIN-SUFFIX 规则已覆盖同样的域名 |
+| **`AI-Proxy` 组：`url-test` → `fallback`** | **关键修复。** `url-test` 会不断跳到"最快"节点，导致出口 IP/地区频繁变动，触发 ChatGPT/OpenAI 风控（403 / "卡在香港"）。`fallback` 保持当前健康节点直到故障才切换。三端全部统一应用。 |
+| **`filter` 移除 `HK-`**（Windows/S24 订阅路径） | HK 节点经常连不上 Google/AI 服务；放进过滤器意味着自动选择器可能选中它然后卡住。HK 节点仍然定义（需要的用户可用），但不再被自动选中 |
+| **S24 配置：订阅 → 内置 13 个 anytls 节点** | `OneMi-S24-ClashMeta.yaml` 从 `proxy-providers`（基于订阅，被墙）改为内联 `proxies:` 13 个 anytls 节点（SG×2 / USA×2 / HK×2 / JP×2 / AU×2 / LU×2 / UK×1），与 iPhone 配置同源，两台设备共享同一出口池 |
+| **凭证占位化** | 所有真实节点密码 / 订阅 token / dashboard 密码替换为 `YOUR_*` 占位符（v1.1 起的约定，本轮编辑后再次确认） |
+
+**验证结果：** 三份配置全部通过 YAML/语法校验，12 个策略组完整保留，零悬空节点引用，所有组的实际选择中零 HK 引用。
 
 ### v1.1 — 安全 + MRS 优化（2026-10-05）
 

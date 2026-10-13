@@ -6,14 +6,14 @@
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version 2.0.0](https://img.shields.io/badge/version-2.0.0-blue.svg)](#changelog)
+[![Version 2.1.0](https://img.shields.io/badge/version-2.1.0-blue.svg)](#changelog)
 
 ```
 OneMi/
-├── OneMi-Windows-ClashVerge.yaml    # Windows + Clash Verge Rev
-├── OneMi-S24-ClashMeta.yaml         # Android (Samsung S24) + ClashMeta
+├── OneMi-Windows-ClashVerge.yaml    # Windows + Clash Verge Rev (subscription-based)
+├── OneMi-S24-ClashMeta.yaml         # Android (Samsung S24) + ClashMeta (13 built-in anytls nodes)
 ├── OneMi-iPhone-YAML.yaml           # iPhone + Shadowrocket (mihomo YAML)
-├── OneMi-iPhone-Shadowrocket.conf   # iPhone + Shadowrocket (native .conf)
+├── OneMi-iPhone-Shadowrocket.conf   # iPhone + Shadowrocket (native .conf, 13 anytls nodes)
 └── gen_onemi.py                     # Generate all platforms from one source
 ```
 
@@ -42,7 +42,7 @@ Full details in [`docs/pitfalls.md`](docs/pitfalls.md).
 | # | Group | Type | Covers | Why |
 |---|-------|------|--------|-----|
 | 1 | **Google-AI** | fallback | Gemini, NotebookLM, AI Studio | Google blocks certain IP ranges |
-| 2 | **AI-Proxy** | fallback | ChatGPT, Claude, Grok | Some nodes dead for OpenAI even if they work for everything else |
+| 2 | **AI-Proxy** | fallback | ChatGPT, Claude, Grok | Some nodes dead for OpenAI even if they work for everything else; **must use `fallback` not `url-test`** — auto-speed-test causes region jumps that trigger OpenAI risk control (see v2.1.0 changelog) |
 | 3 | **Note-Tools** | url-test | Notion, Obsidian, Craft | Low-stakes |
 | 4 | **Dev-AI** | url-test | Cursor, Copilot, Replit | Low-stakes |
 | 5 | **CF-Strict** | select | Perplexity, Mistral, Poe | Cloudflare Bot Management — needs manual selection |
@@ -256,6 +256,22 @@ Contributions welcome! Especially:
 ---
 
 ## Changelog
+
+### v2.1.0 — Network-block resilience + AI-Proxy region-jump fix (2026-10-13)
+
+When the upstream `raw.githubusercontent.com` and subscription hosts became unreachable from CN networks (DNS resolves but TCP times out — a network-layer block, not a DNS issue), configs relying on those hosts failed to load any nodes or rulesets at all. This release makes the configs resilient to that failure mode, and fixes a separate region-jump bug that affected all three platforms.
+
+| Change | Impact |
+|--------|--------|
+| **`geox-url` switched to jsDelivr CDN** | geoip/geosite/mmdb databases now download from `cdn.jsdelivr.net` instead of `raw.githubusercontent.com` — core starts even when GitHub raw is blocked |
+| **`rule-providers` block removed** | 11 entries (4 MRS + 7 blackmatrix7) all pointed at blocked GitHub hosts and caused core startup failure; AI-service matching now falls back to built-in `GEOSITE` + `DOMAIN-SUFFIX` rules |
+| **10 `RULE-SET` rules cleaned up** | Removed all rules referencing the deleted rulesets; existing GEOSITE/DOMAIN-SUFFIX rules already cover the same domains |
+| **`AI-Proxy` group: `url-test` → `fallback`** | **Critical fix.** `url-test` kept jumping to the "fastest" node, which rotated the exit IP/region and triggered ChatGPT/OpenAI risk control (403 / "stuck in HK"). `fallback` stays on the first healthy node until it fails. Applied to all three platforms for consistency. |
+| **`filter` removes `HK-`** (Windows/S24 subscription path) | HK nodes frequently can't reach Google/AI services; including them in the filter meant the auto-selector could pick one and get stuck. HK nodes are still defined (for users who want them) but no longer selected automatically. |
+| **S24 config: subscription → 13 built-in anytls nodes** | Switched `OneMi-S24-ClashMeta.yaml` from `proxy-providers` (subscription-based, blocked) to inline `proxies:` with 13 anytls nodes (SG×2 / USA×2 / HK×2 / JP×2 / AU×2 / LU×2 / UK×1), matching the iPhone config so both devices share the same exit pool |
+| **Credentials placeholderized** | Real node passwords / subscription tokens / dashboard secrets replaced with `YOUR_*` placeholders (was already the convention since v1.1; reaffirmed after this round of edits) |
+
+**Verification:** all three configs pass YAML/syntax validation, 12 proxy-groups preserved, 0 dangling node references, 0 HK references in any group's active selection.
 
 ### v2.0.0 — OneMi Brand (2026-10-05)
 

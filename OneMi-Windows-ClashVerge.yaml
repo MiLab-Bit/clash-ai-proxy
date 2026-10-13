@@ -9,7 +9,7 @@
 # ============================================================
 mode: rule
 mixed-port: 7897
-allow-lan: false
+allow-lan: true
 log-level: warning
 ipv6: false
 external-controller: 127.0.0.1:9097
@@ -18,9 +18,9 @@ unified-delay: true
 tcp-concurrent: true
 geodata-mode: true
 geox-url:
-  geoip: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip.dat
-  geosite: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite.dat
-  mmdb: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/country.mmdb
+  geoip: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip.dat
+  geosite: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite.dat
+  mmdb: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/country.mmdb
 geo-auto-update: true
 geo-update-interval: 168
 keep-alive-interval: 30
@@ -136,83 +136,7 @@ dns:
 profile:
   store-selected: true
   store-fake-ip: true
-rule-providers:
-  geosite-ai:
-    type: http
-    behavior: classical
-    format: mrs
-    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ai-chat-!cn.mrs
-    path: ./ruleset/meta/geosite-ai.mrs
-    interval: 86400
-  geosite-cn:
-    type: http
-    behavior: classical
-    format: mrs
-    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.mrs
-    path: ./ruleset/meta/geosite-cn.mrs
-    interval: 86400
-  geosite-ads:
-    type: http
-    behavior: classical
-    format: mrs
-    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ads-all.mrs
-    path: ./ruleset/meta/geosite-ads.mrs
-    interval: 86400
-  geoip-cn:
-    type: http
-    behavior: classical
-    format: mrs
-    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/cn.mrs
-    path: ./ruleset/meta/geoip-cn.mrs
-    interval: 86400
-  openai-direct:
-    type: http
-    behavior: classical
-    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/OpenAI/OpenAI.yaml
-    path: ./ruleset/blackmatrix7/openai.yaml
-    interval: 86400
-  gemini-direct:
-    type: http
-    behavior: classical
-    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Gemini/Gemini.yaml
-    path: ./ruleset/blackmatrix7/gemini.yaml
-    interval: 86400
-  claude-direct:
-    type: http
-    behavior: classical
-    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Claude/Claude.yaml
-    path: ./ruleset/blackmatrix7/claude.yaml
-    interval: 86400
-  copilot-direct:
-    type: http
-    behavior: classical
-    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/GithubCopilot/GithubCopilot.yaml
-    path: ./ruleset/blackmatrix7/copilot.yaml
-    interval: 86400
-  telegram-direct:
-    type: http
-    behavior: classical
-    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Telegram/Telegram.yaml
-    path: ./ruleset/blackmatrix7/telegram.yaml
-    interval: 86400
-  netflix-direct:
-    type: http
-    behavior: classical
-    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Netflix/Netflix.yaml
-    path: ./ruleset/blackmatrix7/netflix.yaml
-    interval: 86400
-  spotify-direct:
-    type: http
-    behavior: classical
-    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Spotify/Spotify.yaml
-    path: ./ruleset/blackmatrix7/spotify.yaml
-    interval: 86400
-  discord-direct:
-    type: http
-    behavior: classical
-    url: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Clash/Discord/Discord.list
-    path: ./ruleset/blackmatrix7/discord.yaml
-    interval: 86400
+
 proxy-groups:
 - name: Google-AI
   type: fallback
@@ -313,14 +237,6 @@ rules:
 - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
 - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
 - GEOIP,private,DIRECT,no-resolve
-- RULE-SET,gemini-direct,Google-AI
-- RULE-SET,claude-direct,AI-Proxy
-- RULE-SET,openai-direct,AI-Proxy
-- RULE-SET,copilot-direct,Dev-AI
-- RULE-SET,telegram-direct,Social
-- RULE-SET,netflix-direct,Game-Media
-- RULE-SET,spotify-direct,Game-Media
-- RULE-SET,discord-direct,Social
 - GEOSITE,openai,AI-Proxy
 - GEOSITE,anthropic,AI-Proxy
 - GEOSITE,gemini,Google-AI
@@ -459,7 +375,6 @@ rules:
 - DOMAIN-SUFFIX,samsung.com,DIRECT
 - DOMAIN-SUFFIX,samsungdns.com,DIRECT
 - DOMAIN-SUFFIX,bspg.samsung-pp.com,DIRECT
-- RULE-SET,geosite-ai,AI-Proxy
 - GEOIP,CN,DIRECT,no-resolve
 - GEOSITE,category-ads-all,REJECT
 - MATCH,Proxy
@@ -485,6 +400,6 @@ proxy-providers:
       enable: true
       url: https://www.gstatic.com/generate_204
       interval: 300
-    filter: SG-|USA-|HK-|JP-|AU-|LU-|UK-
+    filter: SG-|USA-|JP-|AU-|LU-|UK-
     override:
       skip-cert-verify: false
