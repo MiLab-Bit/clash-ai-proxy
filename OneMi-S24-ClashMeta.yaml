@@ -362,7 +362,9 @@ rules:
 - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve
 - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
 - IP-CIDR,100.64.0.0/10,DIRECT,no-resolve
-- GEOIP,private,DIRECT,no-resolve
+# v1.4: 删除 GEOIP,private,DIRECT,no-resolve——上方 5 条 IP-CIDR 已完整覆盖
+#       RFC1918 + loopback + CGNAT 私有地址段，此规则冗余。保留它反而会在
+#       GeoIP.dat 缓存损坏时报 "cannot parse invalid wire-format data" 导致启动失败。
 # v1.2: blackmatrix7 RULE-SET 规则集已删除（对应 rule-providers 被封锁），由下方 GEOSITE 规则兜底
 - GEOSITE,openai,AI-Proxy
 - GEOSITE,anthropic,AI-Proxy
@@ -517,6 +519,8 @@ rules:
 - DOMAIN-SUFFIX,gms.android.google.com,DIRECT  # GMS 推送服务
 # v1.1: 删 googleadservices/googlesyndication 单条 REJECT——已被 GEOSITE,category-ads-all 兜底
 # v1.2: MRS RULE-SET,geosite-ai 已删除（规则集源被封锁）；AI 域名已由上方 GEOSITE,openai/anthropic/gemini + DOMAIN-SUFFIX 规则覆盖
+# v1.4: 如本行报 "failed to decode geodata file GeoIP.dat" 错误，根因是 GeoIP 数据库缓存损坏，
+#       解决方法：删除 ClashMeta 数据目录下缓存的 GeoIP.dat 文件后重启，核心会从 geox-url 自动重新下载
 - GEOIP,CN,DIRECT,no-resolve              # v5.3: 加 no-resolve，fake-ip 下不反解 CN IP，速度更稳
 # v5.5: 广告兜底拦截（DNS 层已静默，这里规则层再兜一次）
 - GEOSITE,category-ads-all,REJECT
