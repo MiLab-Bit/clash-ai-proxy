@@ -524,7 +524,9 @@ rules:
 # v1.2: MRS RULE-SET,geosite-ai 已删除（规则集源被封锁）；AI 域名已由上方 GEOSITE,openai/anthropic/gemini + DOMAIN-SUFFIX 规则覆盖
 # v1.4: 如本行报 "failed to decode geodata file GeoIP.dat" 错误，根因是 GeoIP 数据库缓存损坏，
 #       解决方法：删除 ClashMeta 数据目录下缓存的 GeoIP.dat 文件后重启，核心会从 geox-url 自动重新下载
-- GEOIP,CN,DIRECT,no-resolve              # v5.3: 加 no-resolve，fake-ip 下不反解 CN IP，速度更稳
+# v1.6: 删除 GEOIP,CN,DIRECT,no-resolve——jsDelivr 在移动网络下下载 GeoIP.dat 经常 EOF 中断，
+#       导致核心无法启动。CN 流量由上方第 498 行 GEOSITE,cn,DIRECT 完整覆盖（所有 .cn 域名直连），
+#       删此条只损失极少数"纯 IP 访问的 CN 服务器"的直连兜底（S24 上应用都走域名，几乎无影响）。
 # v5.5: 广告兜底拦截（DNS 层已静默，这里规则层再兜一次）
 - GEOSITE,category-ads-all,REJECT
 - MATCH,Proxy
