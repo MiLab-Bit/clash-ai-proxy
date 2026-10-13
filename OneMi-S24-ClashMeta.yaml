@@ -113,7 +113,8 @@ dns:
     "geosite:google": ['https://dns.google/dns-query']
     "geosite:openai": ['https://dns.google/dns-query']
     "geosite:anthropic": ['https://dns.google/dns-query']
-    "geosite:gemini": ['https://dns.google/dns-query']
+    # v1.5: 删除 "geosite:gemini"——MetaCubeX geosite.dat 中无 gemini 列表。
+    #        Gemini 域名已被 geosite:google 完整覆盖（gemini.google.com 等）
     "geosite:apple": ['https://doh.pub/dns-query', 'https://dns.alidns.com/dns-query']
     "geosite:microsoft": ['https://doh.pub/dns-query', 'https://dns.alidns.com/dns-query']
     # v5.4: 广告域名静默返回空——比 REJECT 更不容易出现"加载转圈"
@@ -368,7 +369,9 @@ rules:
 # v1.2: blackmatrix7 RULE-SET 规则集已删除（对应 rule-providers 被封锁），由下方 GEOSITE 规则兜底
 - GEOSITE,openai,AI-Proxy
 - GEOSITE,anthropic,AI-Proxy
-- GEOSITE,gemini,Google-AI
+# v1.5: 删除 GEOSITE,gemini,Google-AI——MetaCubeX geosite.dat 中无 "gemini" 列表，
+#       会报 "list gemini not found in geosite.dat" 导致启动失败。
+#       Gemini 域名已被下方 GEOSITE,google + 3 条 DOMAIN-SUFFIX 完整覆盖，无需此规则。
 - GEOSITE,google,Google-AI
 - GEOSITE,youtube,Game-Media
 - GEOSITE,telegram,Social
