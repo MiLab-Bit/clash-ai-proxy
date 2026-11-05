@@ -11,3 +11,27 @@ __pycache__/
 # 临时脚本
 push_*.py
 gen_onemi.py
+
+# ---- 2026-11-05 补充：防止带真实值的订阅清单/凭证/内部文档误提交 ----
+# 原规则依赖 *-real.* 后缀，但实际提交的 OneMi-*.yaml 不带该后缀，拦不住
+SUBSCRIPTION.txt
+*subscription*.txt
+*.tar.gz
+*.zip
+nginx-*.conf
+rollback-ports.sh
+watchdog.*
+creds.json
+tunnel*.json
+credentials/
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa*
+*.env
+.env.*
+*.bak*
+HANDOFF.md
+ALTERNATIVES.md
+PUBLISH_ASSESSMENT.md

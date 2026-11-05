@@ -1,0 +1,147 @@
+# 策略组与规则骨架示例（全部占位符，可直接跑 mihomo -t）
+# 替换清单：example.com / <YOUR-HOST> / <YOUR-PATH> / 00000000-...-000000000001
+# 说明见 docs/xhttp-reuse-strategy.md
+# 注意：本文件刻意不含 port / socks-port / mixed-port / dns / external-controller
+
+proxies:
+  # 入口 A：固定边缘地址 + XHTTP（吞吐最优，主力）
+  - name: XH-A
+    type: vless
+    server: 104.0.0.1          # 占位：换成你实测最优的边缘 IP
+    port: 443
+    uuid: 00000000-0000-0000-0000-000000000001
+    tls: true
+    servername: xh-a.example.com
+    client-fingerprint: chrome
+    network: xhttp
+    xhttp-opts:
+      mode: auto
+      path: /<YOUR-PATH>
+      host: <YOUR-HOST>
+      reuse-settings:
+        enabled: true
+        max-concurrency: 4
+        c-max-reuse-times: 64
+        h-max-reusable-secs: 300
+
+  # 入口 A：WebSocket（iOS / 老客户端兼容）
+  - name: WS-A
+    type: vless
+    server: 104.0.0.1
+    port: 443
+    uuid: 00000000-0000-0000-0000-000000000001
+    tls: true
+    servername: ws-a.example.com
+    client-fingerprint: chrome
+    network: ws
+    ws-opts:
+      path: /<YOUR-WS-PATH>
+      headers:
+        Host: <YOUR-HOST>
+
+  # 入口 B：走 DNS 解析，作为固定地址失效时的兜底
+  - name: XH-B
+    type: vless
+    server: xh-b.example.com
+    port: 443
+    uuid: 00000000-0000-0000-0000-000000000001
+    tls: true
+    servername: xh-b.example.com
+    client-fingerprint: chrome
+    network: xhttp
+    xhttp-opts:
+      mode: auto
+      path: /<YOUR-PATH>
+      host: <YOUR-HOST>
+      reuse-settings:
+        enabled: true
+        max-concurrency: 4
+        c-max-reuse-times: 64
+        h-max-reusable-secs: 300
+
+  - name: WS-B
+    type: vless
+    server: ws-b.example.com
+    port: 443
+    uuid: 00000000-0000-0000-0000-000000000001
+    tls: true
+    servername: ws-b.example.com
+    client-fingerprint: chrome
+    network: ws
+    ws-opts:
+      path: /<YOUR-WS-PATH>
+      headers:
+        Host: <YOUR-HOST>
+
+proxy-groups:
+  # 手动兜底
+  - name: SELECT
+    type: select
+    proxies:
+      - Entry-Auto
+      - Proxy
+      - AI-Proxy
+      - Fast-Download
+      - XH-A
+      - WS-A
+      - XH-B
+      - WS-B
+
+  # 端侧入口自动择优
+  - name: Entry-Auto
+    type: url-test
+    url: http://www.gstatic.com/generate_204
+    expected-status: 204
+    interval: 120
+    lazy: false
+    tolerance: 50
+    proxies: [XH-A, WS-A, XH-B, WS-B]
+
+  # 通用网页：追求最低延迟，可随时切换
+  - name: Proxy
+    type: url-test
+    url: http://www.gstatic.com/generate_204
+    expected-status: 204
+    interval: 120
+    lazy: false
+    proxies: [XH-A, WS-A, XH-B, WS-B]
+
+  # AI / 长会话：fallback，避免健康检查中途切断流式回答
+  - name: AI-Proxy
+    type: fallback
+    url: http://www.gstatic.com/generate_204
+    expected-status: 204
+    interval: 120
+    lazy: true
+    proxies: [Entry-Auto, XH-A, WS-A, XH-B, WS-B]
+
+  # 大文件：多流并发
+  - name: Fast-Download
+    type: load-balance
+    url: http://www.gstatic.com/generate_204
+    expected-status: 204
+    interval: 120
+    strategy: round-robin
+    proxies: [XH-A, WS-A, XH-B, WS-B]
+
+rules:
+  # AI 服务走专用组
+  - DOMAIN-SUFFIX,openai.com,AI-Proxy
+  - DOMAIN-SUFFIX,chatgpt.com,AI-Proxy
+  - DOMAIN-SUFFIX,anthropic.com,AI-Proxy
+  - DOMAIN-SUFFIX,claude.ai,AI-Proxy
+  - DOMAIN-SUFFIX,generativelanguage.googleapis.com,AI-Proxy
+  - DOMAIN-SUFFIX,ai.google.dev,AI-Proxy
+  - DOMAIN-SUFFIX,gemini.google.com,AI-Proxy
+  - DOMAIN-SUFFIX,api.x.ai,AI-Proxy
+  - DOMAIN-SUFFIX,copilot.microsoft.com,AI-Proxy
+  # 国内直连
+  - DOMAIN-SUFFIX,baidu.com,DIRECT
+  - DOMAIN-SUFFIX,qq.com,DIRECT
+  - DOMAIN-SUFFIX,taobao.com,DIRECT
+  - DOMAIN-SUFFIX,jd.com,DIRECT
+  - DOMAIN-SUFFIX,163.com,DIRECT
+  # 私有地址直连
+  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
+  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
+  - MATCH,Proxy
