@@ -91,6 +91,7 @@ proxy-groups:
   - name: Entry-Auto
     type: url-test
     url: http://www.gstatic.com/generate_204
+    expected-status: 204
     interval: 120
     lazy: false
     tolerance: 50
@@ -100,6 +101,7 @@ proxy-groups:
   - name: Proxy
     type: url-test
     url: http://www.gstatic.com/generate_204
+    expected-status: 204
     interval: 120
     lazy: false
     proxies: [XH-A, WS-A, XH-B, WS-B]
@@ -108,6 +110,7 @@ proxy-groups:
   - name: AI-Proxy
     type: fallback
     url: http://www.gstatic.com/generate_204
+    expected-status: 204
     interval: 120
     lazy: true
     proxies: [Entry-Auto, XH-A, WS-A, XH-B, WS-B]
@@ -116,6 +119,7 @@ proxy-groups:
   - name: Fast-Download
     type: load-balance
     url: http://www.gstatic.com/generate_204
+    expected-status: 204
     interval: 120
     strategy: round-robin
     proxies: [XH-A, WS-A, XH-B, WS-B]
@@ -135,7 +139,8 @@ rules:
   - DOMAIN-SUFFIX,baidu.com,DIRECT
   - DOMAIN-SUFFIX,qq.com,DIRECT
   - DOMAIN-SUFFIX,taobao.com,DIRECT
-  - GEOSITE,cn,DIRECT
+  - DOMAIN-SUFFIX,jd.com,DIRECT
+  - DOMAIN-SUFFIX,163.com,DIRECT
   # 私有地址直连
   - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
   - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve
