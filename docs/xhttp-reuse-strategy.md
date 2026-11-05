@@ -47,12 +47,13 @@ XHTTP（前身 SplitHTTP）用一串普通 HTTP 请求承载流量：下行一�
   interval: 120
   lazy: false
   tolerance: 50
+  expected-status: 204
   proxies: [XH-A, WS-A, XH-B, WS-B]
 ```
 
 要点：
 
-- **探测目标选 `generate_204`**：返回 204、无内容、开销极小，且不会被登录页/ captive portal 的 200 响应误判为可用。
+- **探测目标选 `generate_204`，并显式校验状态码**：返回 204、无内容、开销极小。但注意 mihomo 的 `expected-status` **默认是 `*`**（对响应状态不做要求），仅仅把探测地址取名为 `generate_204` 并不会强制要求返回 204——流量被劫持到登录页、返回 200 时，节点仍会被判定为可用。因此每个健康检查组都要加 `expected-status: 204`（也支持 `200/302`、`400-503` 这类写法）。
 - **`lazy: false`**：持续探测，切换更及时；若客户端流量极小、想省电，可改 `true`（仅被选中时才测）。
 - **`tolerance`**：避免在两个入口 RTT 接近时反复抖动切换。
 - **固定 IP 入口 vs DNS 入口**：把实测最优的边缘地址直接写进节点，通常明显快于让系统 DNS 就近解析；但固定地址会失效，所以**必须**同时保留一组走 DNS 的兜底节点。两者共存，不要二选一。
@@ -104,10 +105,14 @@ rules:
   # 国内直连
   - DOMAIN-SUFFIX,baidu.com,DIRECT
   - DOMAIN-SUFFIX,qq.com,DIRECT
-  - GEOSITE,cn,DIRECT
+  - DOMAIN-SUFFIX,taobao.com,DIRECT
+  - DOMAIN-SUFFIX,jd.com,DIRECT
+  - DOMAIN-SUFFIX,163.com,DIRECT
   # 兜底
   - MATCH,Proxy
 ```
+
+若确实需要覆盖大量国内域名，可以用 `GEOSITE,cn,DIRECT`，但前提是客户端本地已有 `geosite.dat`：mihomo 解析该规则时若缺少数据库会尝试下载，下载失败即报错——恰好是本节要避免的场景。**「零外部依赖」与 `GEOSITE` 规则只能二选一**，不要一边宣称内嵌、一边留着外部规则。
 
 ## 7. 可选加固（针对网络层指纹）
 
@@ -126,6 +131,7 @@ rules:
 4. 检查订阅里是否残留本地端口 / DNS / 控制器字段。
 5. 检查 `proxies` 中是否存在悬空引用（组里点名了不存在的节点）。
 6. 在至少一种 iOS 客户端上导入 `/ios` 订阅，确认 WS 节点可解析。
+7. 确认每个带 `url` 的健康检查组都设置了 `expected-status: 204`（默认 `*` 会把返回 200 的劫持页误判为可用）。
 
 ## 小结
 
