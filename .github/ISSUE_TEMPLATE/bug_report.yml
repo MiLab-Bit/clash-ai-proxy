@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a reproducible defect without sharing sensitive information
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not include passwords, API keys, private customer data or exploit details. Report security vulnerabilities privately."
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe actual and expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Provide a minimal reproducible example with synthetic or public data.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Version, OS and relevant configuration (redact secrets).
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and checks
+      description: Include sanitized logs, commands and outcomes; state checks not run.
